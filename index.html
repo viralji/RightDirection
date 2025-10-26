@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RightDirection.AI – MVP Wireframe (B2B Agent Platform)</title>
+<style>
+  :root{
+    --brand:#2b7cff;
+    --brand-2:#0f3d8a;
+    --ok:#32c671;
+    --warn:#ffb020;
+    --bad:#ef5350;
+    --muted:#7a8499;
+    --bg:#0f1221;
+    --card:#151936;
+    --card-2:#1b2147;
+    --text:#eef3ff;
+    --text-2:#c8d0e8;
+    --chip:#283067;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background:linear-gradient(120deg,#0d1020,#111536 70%);
+    color:var(--text);
+  }
+  header{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:18px 22px;
+    background:linear-gradient(90deg, var(--card), var(--card-2));
+    border-bottom:1px solid #1f2759;
+    position:sticky;top:0;z-index:10;
+  }
+  .logo{
+    width:40px;height:40px;border-radius:8px;
+    background:linear-gradient(135deg,var(--brand),#7aa8ff);
+    display:grid;place-content:center;
+    font-weight:800;color:white;
+    box-shadow:0 6px 16px rgba(43,124,255,.35);
+  }
+  .subtitle{color:var(--text-2);font-weight:500;font-size:13px;margin-top:2px}
+  .env{margin-left:auto;display:flex;gap:10px;align-items:center}
+  .chip{padding:6px 10px;border-radius:999px;background:var(--chip);color:#dbe6ff;font-size:12px}
+  .tabs{
+    display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px;border-bottom:1px solid #1f2759;background:linear-gradient(90deg,#111536,#121a3a);
+    position:sticky;top:76px;z-index:9;
+  }
+  .tab{padding:10px 14px;border-radius:10px;background:#0f1533;border:1px solid #1f2759;color:#cfe1ff;cursor:pointer;font-size:14px}
+  .tab.active{background:var(--brand-2);border-color:#204a9a;color:white;box-shadow:0 6px 18px rgba(32,74,154,.4)}
+  main{padding:22px;max-width:1300px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+  .card{
+    background:var(--card);
+    border:1px solid #1f2759;border-radius:14px;padding:16px;
+    box-shadow:0 8px 24px rgba(7,12,40,.25) inset, 0 6px 16px rgba(0,0,0,.25);
+  }
+  .card h3{margin:0 0 10px;font-size:16px}
+  .muted{color:var(--muted)}
+  .kpi{font-size:26px;font-weight:800;margin-top:6px}
+  .progress{
+    height:8px;border-radius:999px;background:#0c1230;overflow:hidden;border:1px solid #203067
+  }
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),#87b3ff)}
+  table{width:100%;border-collapse:separate;border-spacing:0 8px}
+  th,td{padding:10px 12px;text-align:left;font-size:14px}
+  th{color:#a9b6da;font-weight:600}
+  tbody tr{background:#121842;border:1px solid #1f2759}
+  tbody tr td:first-child{border-radius:10px 0 0 10px}
+  tbody tr td:last-child{border-radius:0 10px 10px 0}
+  .pill{padding:4px 8px;border-radius:999px;font-size:12px;display:inline-block}
+  .pill.ok{background:rgba(50,198,113,.15);color:#9be5b7;border:1px solid rgba(50,198,113,.35)}
+  .pill.warn{background:rgba(255,176,32,.15);color:#ffd598;border:1px solid rgba(255,176,32,.35)}
+  .pill.bad{background:rgba(239,83,80,.15);color:#f7a4a3;border:1px solid rgba(239,83,80,.35)}
+  .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .right{margin-left:auto}
+  .btn{background:var(--brand);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer}
+  .btn.secondary{background:#1b255a}
+  .tag{font-size:11px;color:#a9b6da;background:#0d1436;border:1px solid #203067;padding:4px 8px;border-radius:999px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .hidden{display:none}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#7aa8ff;display:inline-grid;place-content:center;color:white;font-weight:700}
+  .flow{background:var(--card);padding:14px;border:1px solid #1f2759;border-radius:14px}
+  svg{max-width:100%;height:auto}
+  .kbd{background:#0c1130;border:1px solid #1e2f62;padding:2px 6px;border-radius:6px;font-size:12px;color:#bdc8ea}
+  .search{padding:10px 12px;border-radius:10px;border:1px solid #22316a;background:#0d1436;color:#e6ecff;width:100%}
+  .toolbar{display:flex;gap:10px;align-items:center;margin:10px 0}
+  .small{font-size:12px;color:#a9b6da}
+  .spacer{height:10px}
+  .code{font-family: ui-monospace,SFMono-Regular,Consolas,Monaco,monospace;font-size:12px;background:#0c1130;border:1px solid #23306a;border-radius:10px;padding:10px;color:#d9e3ff;white-space:pre;overflow:auto}
+  @media (max-width: 900px){
+    .grid{grid-template-columns:1fr}
+    .two-col{grid-template-columns:1fr}
+    header{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">AL</div>
+  <div>
+    <div style="font-weight:800;letter-spacing:.3px">RightDirection.AI — MVP Wireframe</div>
+    <div class="subtitle">B2B white-label platform for Tier-2/3 study-abroad agents • AI + Back-Office</div>
+  </div>
+  <div class="env">
+    <span class="chip">Tenant: <strong>Bright Intakes</strong></span>
+    <span class="chip">SLA: 48h</span>
+    <span class="chip">Build: v0.1</span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="dashboard">Dashboard</button>
+  <button class="tab" data-tab="students">Students</button>
+  <button class="tab" data-tab="applications">Applications</button>
+  <button class="tab" data-tab="ai">AI Workbench</button>
+  <button class="tab" data-tab="backoffice">Back-Office</button>
+  <button class="tab" data-tab="trust">University Trust</button>
+  <button class="tab" data-tab="reports">Reports</button>
+  <button class="tab" data-tab="settings">Settings</button>
+  <button class="tab" data-tab="about">User Flow</button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="tabpane">
+    <div class="grid">
+      <div class="card" style="grid-column: span 3;">
+        <h3>Active Students</h3>
+        <div class="kpi">178</div>
+        <div class="muted small">+12 this week</div>
+      </div>
+      <div class="card" style="grid-column: span 3;">
+        <h3>Reviews Due Today</h3>
+        <div class="kpi">9</div>
+        <div class="muted small">SLA: <span class="pill warn">3 close to breach</span></div>
+      </div>
+      <div class="card" style="grid-column: span 3;">
+        <h3>Offers Expiring (7d)</h3>
+        <div class="kpi">5</div>
+        <div class="progress"><i style="width:65%"></i></div>
+        <div class="muted small">65% on track</div>
+      </div>
+      <div class="card" style="grid-column: span 3;">
+        <h3>Fee Payments Pending</h3>
+        <div class="kpi">12</div>
+        <div class="muted small">Show partners at stage <span class="kbd">Fee Payment</span></div>
+      </div>
+
+      <div class="card" style="grid-column: span 8;">
+        <div class="flex">
+          <h3>Pipeline</h3>
+          <div class="right small muted">Lead → Docs → Review → Submitted → Offer → Conditions → Fee → Done</div>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Stage</th><th>Count</th><th>Avg Days</th><th>SLA Risk</th><th>Notes</th>
+          </tr></thead>
+          <tbody id="pipelineTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card" style="grid-column: span 4;">
+        <div class="flex"><h3>Quick Actions</h3></div>
+        <div class="spacer"></div>
+        <div class="two-col">
+          <button class="btn" onclick="go('students')">Add Student</button>
+          <button class="btn" onclick="go('ai')">Generate SOP</button>
+          <button class="btn" onclick="go('applications')">Create Application</button>
+          <button class="btn" onclick="go('backoffice')">Send to Back-Office</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="small muted">Tip: Use <span class="kbd">/</span> to search anywhere.</div>
+      </div>
+
+      <div class="card" style="grid-column: span 12;">
+        <h3>Notifications</h3>
+        <table>
+          <thead><tr><th>When</th><th>Message</th><th>Type</th><th>Action</th></tr></thead>
+          <tbody id="notifTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- STUDENTS -->
+  <section id="students" class="tabpane hidden">
+    <div class="card">
+      <div class="flex">
+        <h3>Students</h3>
+        <input class="search right" placeholder="Search name / email / phone / course..." oninput="filterStudents(this.value)"/>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Student</th><th>Contact</th><th>Target</th><th>Docs</th><th>Completeness</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="studentTable"></tbody>
+      </table>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3>Profile (Selected)</h3>
+        <div id="studentProfile" class="small"></div>
+      </div>
+      <div class="card">
+        <h3>Documents</h3>
+        <div id="studentDocs" class="small"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- APPLICATIONS -->
+  <section id="applications" class="tabpane hidden">
+    <div class="card">
+      <div class="flex">
+        <h3>Applications</h3>
+        <div class="right">
+          <span class="tag">Lead</span>
+          <span class="tag">Docs</span>
+          <span class="tag">Review</span>
+          <span class="tag">Submitted</span>
+          <span class="tag">Offer</span>
+          <span class="tag">Conditions</span>
+          <span class="tag">Fee</span>
+          <span class="tag">Done</span>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Student</th><th>University</th><th>Course</th><th>Stage</th><th>Deadline</th><th>Assignee</th><th>Evidence</th><th>Action</th></tr></thead>
+        <tbody id="appsTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="flex">
+        <h3>Autofill Preview</h3>
+        <div class="right small muted">Shows confidence for each mapped field</div>
+      </div>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th><th>Confidence</th><th>Fix</th></tr></thead>
+        <tbody id="autofillTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- AI WORKBENCH -->
+  <section id="ai" class="tabpane hidden">
+    <div class="two-col">
+      <div class="card">
+        <h3>AI Draft: Statement of Purpose</h3>
+        <div class="toolbar">
+          <select id="sopTone" class="search" style="max-width:180px">
+            <option>Formal</option>
+            <option>Narrative</option>
+            <option>Academic</option>
+            <option>Concise</option>
+          </select>
+          <input id="sopHighlights" class="search" style="max-width:380px" placeholder="Add highlights (e.g., 'IoT project, 8.2 CGPA, 2 yrs experience')" />
+          <button class="btn" onclick="generateSOP()">Generate</button>
+          <button class="btn secondary" onclick="approveDraft('SOP')">Approve Draft</button>
+        </div>
+        <textarea id="sopDraft" style="width:100%;height:260px;background:#0c1130;border:1px solid #22316a;color:#e6ecff;border-radius:12px;padding:12px"></textarea>
+        <div class="small muted">Sources: Student Profile • Target Course</div>
+      </div>
+
+      <div class="card">
+        <h3>AI Draft: CV</h3>
+        <div class="toolbar">
+          <select id="cvTone" class="search" style="max-width:180px">
+            <option>ATS-friendly</option>
+            <option>Academic</option>
+            <option>Project-heavy</option>
+          </select>
+          <button class="btn" onclick="generateCV()">Generate</button>
+          <button class="btn secondary" onclick="approveDraft('CV')">Approve Draft</button>
+        </div>
+        <textarea id="cvDraft" style="width:100%;height:260px;background:#0c1130;border:1px solid #22316a;color:#e6ecff;border-radius:12px;padding:12px"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Offer Letter Parser</h3>
+      <table>
+        <thead><tr><th>Offer</th><th>Extracted Conditions</th><th>Deadline</th><th>Auto-Tasks</th><th>Status</th></tr></thead>
+        <tbody id="offerTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- BACK-OFFICE -->
+  <section id="backoffice" class="tabpane hidden">
+    <div class="two-col">
+      <div class="card">
+        <h3>Review Queue (by SLA)</h3>
+        <table>
+          <thead><tr><th>Application</th><th>Agency</th><th>SLA</th><th>Risk</th><th>Action</th></tr></thead>
+          <tbody id="reviewTable"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Submission Evidence</h3>
+        <table>
+          <thead><tr><th>App</th><th>Method</th><th>Submitted At</th><th>Evidence</th></tr></thead>
+          <tbody id="evidenceTable"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Internal Notes (Private to Back-Office)</h3>
+      <div class="code" id="internalNotes">// Select an application to view notes</div>
+    </div>
+  </section>
+
+  <!-- TRUST PORTAL -->
+  <section id="trust" class="tabpane hidden">
+    <div class="card">
+      <div class="flex">
+        <h3>University Trust — Read-only Snapshot</h3>
+        <div class="right small muted">Share this page as a secure link per application</div>
+      </div>
+      <table>
+        <thead><tr><th>Student</th><th>Application</th><th>Verified Docs</th><th>Audit Trail</th><th>Authenticity</th><th>View</th></tr></thead>
+        <tbody id="trustTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section id="reports" class="tabpane hidden">
+    <div class="grid">
+      <div class="card" style="grid-column: span 6;">
+        <h3>Agency Performance</h3>
+        <table>
+          <thead><tr><th>Agency</th><th>Apps</th><th>Submit Rate</th><th>Avg SLA</th><th>AI Draft Use</th></tr></thead>
+          <tbody id="agencyPerf"></tbody>
+        </table>
+      </div>
+      <div class="card" style="grid-column: span 6;">
+        <h3>University Conversions</h3>
+        <table>
+          <thead><tr><th>University</th><th>Apps</th><th>Offers</th><th>Offer Rate</th><th>Deposit</th></tr></thead>
+          <tbody id="uniPerf"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="tabpane hidden">
+    <div class="two-col">
+      <div class="card">
+        <h3>Branding</h3>
+        <div class="toolbar">
+          <input class="search" style="max-width:260px" value="Bright Intakes" />
+          <input class="search" style="max-width:260px" value="brightintakes.RightDirection.AI.in" />
+        </div>
+        <div class="toolbar">
+          <label class="small">Primary Color</label>
+          <input type="color" value="#2b7cff" />
+          <label class="small">WhatsApp Number</label>
+          <input class="search" style="max-width:200px" value="+91 98765 43210" />
+        </div>
+        <button class="btn">Save Branding</button>
+      </div>
+      <div class="card">
+        <h3>Templates</h3>
+        <div class="toolbar">
+          <select class="search" style="max-width:260px">
+            <option>University Checklist: University of Glasgow – MSc Data Science</option>
+            <option>University Checklist: Monash – MEng</option>
+            <option>University Checklist: University of Adelaide – MBA</option>
+          </select>
+          <button class="btn secondary">Edit Template</button>
+          <button class="btn">Assign to Agency</button>
+        </div>
+        <div class="small muted">Templates drive document requirements & autofill mappings.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- USER FLOW (on-page diagram) -->
+  <section id="about" class="tabpane hidden">
+    <div class="card">
+      <h3>User Flow — End-to-End Journey</h3>
+      <div class="flow">
+        <!-- Inline SVG diagram -->
+        <svg viewBox="0 0 1200 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="User Flow Diagram">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1">
+              <stop offset="0%" stop-color="#2b7cff"/>
+              <stop offset="100%" stop-color="#7aa8ff"/>
+            </linearGradient>
+            <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity=".35"/></filter>
+            <style>
+              .box{fill:#141a3a;stroke:#2a3570;stroke-width:1.2;rx:10;ry:10;filter:url(#shadow)}
+              .title{fill:#e7eeff;font-weight:700;font-size:14px}
+              .cap{fill:#aab7e1;font-size:12px}
+              .arrow{stroke:url(#g1);stroke-width:2;marker-end:url(#m1)}
+              .legend{fill:#c8d0e8;font-size:12px}
+            </style>
+            <marker id="m1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <polygon points="0 0, 6 3, 0 6" fill="url(#g1)"/>
+            </marker>
+          </defs>
+
+          <!-- Swimlane labels -->
+          <text x="40" y="30" class="legend">Agency</text>
+          <text x="40" y="190" class="legend">Back-Office</text>
+          <text x="40" y="350" class="legend">University</text>
+
+          <!-- Agency lane boxes -->
+          <rect x="120" y="50" width="220" height="70" class="box"/><text x="140" y="75" class="title">1) Student Intake</text><text x="140" y="96" class="cap">WhatsApp link • Mobile form</text>
+          <rect x="380" y="50" width="240" height="70" class="box"/><text x="400" y="75" class="title">2) Docs & AI Drafts</text><text x="400" y="96" class="cap">Vault • CV/SOP/LOR</text>
+          <rect x="660" y="50" width="220" height="70" class="box"/><text x="680" y="75" class="title">3) Autofill Preview</text><text x="680" y="96" class="cap">Fix low-confidence fields</text>
+          <rect x="920" y="50" width="220" height="70" class="box"/><text x="940" y="75" class="title">4) Send to Back-Office</text><text x="940" y="96" class="cap">Starts 48h SLA</text>
+
+          <!-- Back-Office lane boxes -->
+          <rect x="220" y="210" width="240" height="70" class="box"/><text x="240" y="235" class="title">5) Review & Submit</text><text x="240" y="256" class="cap">Evidence + audit trail</text>
+          <rect x="500" y="210" width="240" height="70" class="box"/><text x="520" y="235" class="title">6) Offer Parsing</text><text x="520" y="256" class="cap">Tasks & deadlines</text>
+          <rect x="780" y="210" width="240" height="70" class="box"/><text x="800" y="235" class="title">7) Fee Payment</text><text x="800" y="256" class="cap">Partners + proof</text>
+
+          <!-- University lane boxes -->
+          <rect x="380" y="370" width="260" height="70" class="box"/><text x="400" y="395" class="title">8) Trust Portal</text><text x="400" y="416" class="cap">Read-only verified pack</text>
+          <rect x="700" y="370" width="260" height="70" class="box"/><text x="720" y="395" class="title">9) Decision</text><text x="720" y="416" class="cap">Offer → Conditions → CAS</text>
+
+          <!-- Arrows -->
+          <line x1="340" y1="85" x2="380" y2="85" class="arrow"/>
+          <line x1="620" y1="85" x2="660" y2="85" class="arrow"/>
+          <line x1="880" y1="85" x2="920" y2="85" class="arrow"/>
+          <line x1="1030" y1="120" x2="1030" y2="210" class="arrow"/>
+          <line x1="340" y1="245" x2="500" y2="245" class="arrow"/>
+          <line x1="740" y1="245" x2="780" y2="245" class="arrow"/>
+          <line x1="900" y1="245" x2="900" y2="370" class="arrow"/>
+          <line x1="640" y1="405" x2="700" y2="405" class="arrow"/>
+        </svg>
+      </div>
+      <div class="small muted" style="margin-top:8px">
+        Journey: <strong>Intake</strong> → <strong>Docs & AI Drafts</strong> → <strong>Autofill</strong> → <strong>Back-Office Review</strong> → <strong>Offer & Conditions</strong> → <strong>Fee</strong> → <strong>Trust Portal</strong> → <strong>Decision</strong>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Keyboard Shortcuts</h3>
+      <div class="small">
+        <span class="kbd">/</span> Search • <span class="kbd">g d</span> Dashboard • <span class="kbd">g s</span> Students • <span class="kbd">g a</span> Applications
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// --- Simple SPA tab system ---
+const tabs = document.querySelectorAll('.tab');
+const panes = document.querySelectorAll('.tabpane');
+function go(id){
+  panes.forEach(p => p.classList.add('hidden'));
+  tabs.forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.remove('hidden');
+  document.querySelector('.tab[data-tab="'+id+'"]').classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+tabs.forEach(t => t.addEventListener('click', () => go(t.dataset.tab)));
+
+// Keyboard navigation
+window.addEventListener('keydown', (e)=>{
+  if(e.key === '/'){ e.preventDefault(); const s = document.querySelector('.search'); if(s){ s.focus(); s.select(); } }
+  if(e.key === 'g'){
+    window._gPressed = true; setTimeout(()=>window._gPressed=false,600);
+  } else if(window._gPressed){
+    if(e.key==='d') go('dashboard');
+    if(e.key==='s') go('students');
+    if(e.key==='a') go('applications');
+  }
+});
+
+// --- Mock Data ---
+const data = {
+  pipeline:[
+    {stage:'Lead', count:34, avgDays:2, risk:'Low', notes:'High WhatsApp intake'},
+    {stage:'Documents', count:51, avgDays:5, risk:'Medium', notes:'Bank statements missing'},
+    {stage:'Review (Back-Office)', count:18, avgDays:2, risk:'High', notes:'SLA nearing for 3'},
+    {stage:'Submitted', count:42, avgDays:1, risk:'Low', notes:'Evidence logged'},
+    {stage:'Offer', count:16, avgDays:4, risk:'Medium', notes:'5 expiring in 7 days'},
+    {stage:'Conditions', count:9, avgDays:3, risk:'Low', notes:'IELTS pending for 2'},
+    {stage:'Fee Payment', count:12, avgDays:1, risk:'Medium', notes:'Partner links shared'},
+    {stage:'Done', count:7, avgDays:0, risk:'Low', notes:'Congrats!'}
+  ],
+  notifications:[
+    {when:'10:14 AM', message:'Offer expiring for Priya S (Glasgow MSc DS) – deposit by Nov 15', type:'Offer', action:'Open'},
+    {when:'Yesterday', message:'3 applications exceed 36h review SLA threshold', type:'SLA', action:'Queue'},
+    {when:'2 days ago', message:'Payment proof uploaded for Aarav K (Monash MEng)', type:'Payment', action:'Verify'},
+  ],
+  students:[
+    {id:1, name:'Priya Sharma', contact:'priya.s@example.com · +91 98765 00123', target:'Glasgow • MSc Data Science', docs:'8/10', completeness:0.82, status:'Docs', risk:'warn'},
+    {id:2, name:'Aarav Kumar', contact:'aarav.k@example.com · +91 99000 44121', target:'Monash • MEng', docs:'10/12', completeness:0.74, status:'Review', risk:'ok'},
+    {id:3, name:'Sneha Patel', contact:'sneha.p@example.com · +91 99876 00011', target:'Adelaide • MBA', docs:'6/11', completeness:0.55, status:'Lead', risk:'bad'},
+    {id:4, name:'Mohit Verma', contact:'mohit.v@example.com · +91 90456 11122', target:'Toronto • BSc CS', docs:'9/12', completeness:0.71, status:'Offer', risk:'warn'},
+    {id:5, name:'Nisha Reddy', contact:'nisha.r@example.com · +91 90001 55521', target:'TU Delft • MSc AI', docs:'7/10', completeness:0.61, status:'Documents', risk:'ok'}
+  ],
+  selectedStudentId:1,
+  docs:{
+    1:[
+      {type:'Passport', status:'Verified', authenticity:'97%'},
+      {type:'Transcript', status:'Verified', authenticity:'94%'},
+      {type:'IELTS', status:'Pending', authenticity:'—'},
+      {type:'Bank Statement', status:'Verified', authenticity:'92%'},
+      {type:'SOP', status:'Approved', authenticity:'N/A'}
+    ]
+  },
+  applications:[
+    {student:'Priya Sharma', uni:'University of Glasgow', course:'MSc Data Science', stage:'Offer', deadline:'2025-11-15', assignee:'A. Mehra', evidence:'Offer.pdf', action:'Open'},
+    {student:'Aarav Kumar', uni:'Monash University', course:'MEng (Mechanical)', stage:'Fee', deadline:'2025-10-30', assignee:'J. Patel', evidence:'Payment-Receipt.png', action:'Verify'},
+    {student:'Sneha Patel', uni:'University of Adelaide', course:'MBA', stage:'Docs', deadline:'2025-11-05', assignee:'S. Rao', evidence:'—', action:'Request'},
+  ],
+  autofill:[
+    {field:'Given Name', value:'Priya', conf:0.98},
+    {field:'Family Name', value:'Sharma', conf:0.98},
+    {field:'DOB', value:'2002-08-17', conf:0.91},
+    {field:'Passport No', value:'S1234567', conf:0.86},
+    {field:'UG CGPA', value:'8.2', conf:0.77},
+    {field:'IELTS Overall', value:'—', conf:0.35},
+    {field:'Address', value:'Jabalpur, MP, India', conf:0.74},
+  ],
+  offers:[
+    {offer:'Glasgow – MSc DS – Priya S', conditions:'Pay £2,000 deposit; Provide official IELTS report', deadline:'2025-11-15', tasks:'Create payment task; Request IELTS TRF', status:'Open'}
+  ],
+  reviewQueue:[
+    {app:'Sneha P → Adelaide MBA', agency:'Bright Intakes', sla:'48h', risk:'High'},
+    {app:'Nisha R → TU Delft MSc AI', agency:'Bright Intakes', sla:'36h', risk:'Medium'},
+    {app:'Mohit V → Toronto BSc', agency:'NorthEd', sla:'24h', risk:'Low'}
+  ],
+  evidence:[
+    {app:'Aarav K → Monash MEng', method:'Portal Upload', submittedAt:'2025-10-22 16:41', evidence:'Receipt.png'},
+    {app:'Priya S → Glasgow MSc DS', method:'Email', submittedAt:'2025-10-21 11:09', evidence:'Offer.pdf'},
+  ],
+  trust:[
+    {student:'Priya Sharma', app:'Glasgow MSc DS', docs:'Passport, Transcript, Bank Statement', audit:'12 events • hash#A1B2', auth:'96%', link:'View'},
+    {student:'Aarav Kumar', app:'Monash MEng', docs:'Passport, IELTS, Receipt', audit:'10 events • hash#C3D4', auth:'94%', link:'View'}
+  ],
+  agencyPerf:[
+    {agency:'Bright Intakes', apps:88, submit:'72%', sla:'43h', ai:'82%'},
+    {agency:'NorthEd', apps:40, submit:'65%', sla:'50h', ai:'61%'}
+  ],
+  uniPerf:[
+    {uni:'University of Glasgow', apps:22, offers:16, rate:'73%', deposit:'12'},
+    {uni:'Monash University', apps:15, offers:11, rate:'73%', deposit:'9'},
+    {uni:'University of Adelaide', apps:12, offers:7, rate:'58%', deposit:'5'}
+  ]
+};
+
+// --- Renderers ---
+function renderPipeline(){
+  const tbody = document.getElementById('pipelineTable');
+  tbody.innerHTML = data.pipeline.map(p => `
+    <tr>
+      <td>${p.stage}</td>
+      <td>${p.count}</td>
+      <td>${p.avgDays}</td>
+      <td>${pillFor(p.risk)}</td>
+      <td>${p.notes}</td>
+    </tr>`).join('');
+}
+function renderNotifs(){
+  const tb = document.getElementById('notifTable');
+  tb.innerHTML = data.notifications.map(n => `
+    <tr>
+      <td>${n.when}</td>
+      <td>${n.message}</td>
+      <td><span class="tag">${n.type}</span></td>
+      <td><button class="btn secondary">${n.action}</button></td>
+    </tr>`).join('');
+}
+function pillFor(kind){
+  const cls = kind==='Low' ? 'ok' : kind==='Medium' ? 'warn' : 'bad';
+  return `<span class="pill ${cls}">${kind}</span>`;
+}
+function renderStudents(list = data.students){
+  const tb = document.getElementById('studentTable');
+  tb.innerHTML = list.map(s => `
+    <tr onclick="selectStudent(${s.id})" style="cursor:pointer">
+      <td><span class="avatar">${s.name.split(' ').map(p=>p[0]).join('')}</span> ${s.name}</td>
+      <td>${s.contact}</td>
+      <td>${s.target}</td>
+      <td>${s.docs}</td>
+      <td><div class="progress"><i style="width:${Math.round(s.completeness*100)}%"></i></div></td>
+      <td>${pillFor(s.risk === 'ok' ? 'Low' : s.risk === 'warn' ? 'Medium' : 'High')}</td>
+      <td><button class="btn secondary">Open</button></td>
+    </tr>`).join('');
+  // select first by default
+  selectStudent(list[0]?.id ?? data.students[0].id);
+}
+function selectStudent(id){
+  data.selectedStudentId = id;
+  const s = data.students.find(x=>x.id===id) || data.students[0];
+  document.getElementById('studentProfile').innerHTML = `
+    <div><strong>Name:</strong> ${s.name}</div>
+    <div><strong>Contact:</strong> ${s.contact}</div>
+    <div><strong>Target:</strong> ${s.target}</div>
+    <div><strong>Status:</strong> ${s.status}</div>
+    <div><strong>Completeness:</strong> ${Math.round(s.completeness*100)}%</div>
+    <div class="spacer"></div>
+    <div class="muted">Notes: Prefers Jan 2026 intake; budget ₹28–32L; location flexible.</div>
+  `;
+  const docs = data.docs[id] || [{type:'Passport',status:'—',authenticity:'—'}];
+  document.getElementById('studentDocs').innerHTML = docs.map(d => `
+    <div class="flex" style="justify-content:space-between;border-bottom:1px dashed #26316a;padding:6px 0">
+      <div><strong>${d.type}</strong></div>
+      <div class="small">${d.status} • Authenticity: ${d.authenticity}</div>
+    </div>
+  `).join('');
+}
+function filterStudents(q){
+  const ql = q.toLowerCase();
+  const list = data.students.filter(s =>
+    s.name.toLowerCase().includes(ql) ||
+    s.contact.toLowerCase().includes(ql) ||
+    s.target.toLowerCase().includes(ql)
+  );
+  renderStudents(list.length ? list : data.students);
+}
+function renderApps(){
+  const tb = document.getElementById('appsTable');
+  tb.innerHTML = data.applications.map(a => `
+    <tr onclick="showNotes('${a.student} → ${a.uni}')" style="cursor:pointer">
+      <td>${a.student}</td><td>${a.uni}</td><td>${a.course}</td>
+      <td>${a.stage}</td><td>${a.deadline}</td><td>${a.assignee}</td>
+      <td>${a.evidence}</td>
+      <td><button class="btn secondary">Open</button></td>
+    </tr>`).join('');
+}
+function renderAutofill(){
+  const tb = document.getElementById('autofillTable');
+  tb.innerHTML = data.autofill.map(f => {
+    let conf = Math.round(f.conf*100);
+    let cls = conf>85 ? 'ok' : conf>60 ? 'warn' : 'bad';
+    return `
+      <tr>
+        <td>${f.field}</td><td>${f.value}</td>
+        <td><div class="progress"><i style="width:${conf}%"></i></div> <span class="small muted">${conf}%</span></td>
+        <td>${conf<60?'<button class="btn">Fix</button>':'—'}</td>
+      </tr>`;
+  }).join('');
+}
+function generateSOP(){
+  const tone = document.getElementById('sopTone').value;
+  const hi = document.getElementById('sopHighlights').value || 'IoT project; 8.2 CGPA; 2 yrs experience';
+  const sample = `Statement of Purpose — ${tone}
+I, Priya Sharma, am applying to the MSc in Data Science at the University of Glasgow.
+Highlights: ${hi}.
+My long-term goal is to combine machine learning with public data infrastructure to build reliable systems for India.`;
+  document.getElementById('sopDraft').value = sample;
+}
+function generateCV(){
+  const tone = document.getElementById('cvTone').value;
+  const sample = `CV — ${tone}
+Priya Sharma | Jabalpur, India | priya.s@example.com
+Education: B.Tech CSE (8.2/10) — 2024
+Projects: IoT Monitoring; Retail Forecasting (XGBoost).
+Experience: Data Analyst Intern, 6 months.`;
+  document.getElementById('cvDraft').value = sample;
+}
+function approveDraft(kind){
+  alert(kind+' draft marked as Approved ✓');
+}
+function renderOffers(){
+  const tb = document.getElementById('offerTable');
+  tb.innerHTML = data.offers.map(o => `
+    <tr>
+      <td>${o.offer}</td>
+      <td>${o.conditions}</td>
+      <td>${o.deadline}</td>
+      <td>${o.tasks}</td>
+      <td><span class="pill ok">Open</span></td>
+    </tr>`).join('');
+}
+function renderReview(){
+  const tb = document.getElementById('reviewTable');
+  tb.innerHTML = data.reviewQueue.map(r => `
+    <tr onclick="showNotes('${r.app}')" style="cursor:pointer">
+      <td>${r.app}</td><td>${r.agency}</td><td>${r.sla}</td>
+      <td>${pillFor(r.risk==='Low'?'Low':r.risk==='Medium'?'Medium':'High')}</td>
+      <td><button class="btn">Open</button></td>
+    </tr>`).join('');
+}
+function renderEvidence(){
+  const tb = document.getElementById('evidenceTable');
+  tb.innerHTML = data.evidence.map(e => `
+    <tr>
+      <td>${e.app}</td><td>${e.method}</td><td>${e.submittedAt}</td><td>${e.evidence}</td>
+    </tr>`).join('');
+}
+function showNotes(app){
+  document.getElementById('internalNotes').textContent = `// Internal Notes for ${app}
+- Verified transcripts; CGPA 8.2.
+- Pending IELTS TRF; student scheduled for Nov 3.
+- Deposit negotiation possible (ask for extension).`;
+}
+function renderTrust(){
+  const tb = document.getElementById('trustTable');
+  tb.innerHTML = data.trust.map(t => `
+    <tr>
+      <td>${t.student}</td><td>${t.app}</td>
+      <td>${t.docs}</td><td>${t.audit}</td><td>${t.auth}</td>
+      <td><button class="btn secondary">${t.link}</button></td>
+    </tr>`).join('');
+}
+function renderReports(){
+  document.getElementById('agencyPerf').innerHTML = data.agencyPerf.map(a => `
+    <tr><td>${a.agency}</td><td>${a.apps}</td><td>${a.submit}</td><td>${a.sla}</td><td>${a.ai}</td></tr>
+  `).join('');
+  document.getElementById('uniPerf').innerHTML = data.uniPerf.map(u => `
+    <tr><td>${u.uni}</td><td>${u.apps}</td><td>${u.offers}</td><td>${u.rate}</td><td>${u.deposit}</td></tr>
+  `).join('');
+}
+
+// Initial render
+renderPipeline();
+renderNotifs();
+renderStudents();
+renderApps();
+renderAutofill();
+renderOffers();
+renderReview();
+renderEvidence();
+renderTrust();
+renderReports();
+</script>
+</body>
+</html>
