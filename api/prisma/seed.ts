@@ -186,8 +186,8 @@ async function main() {
       subdomain: 'demo',
       name: 'StudyVision Consultancy',
       email: 'demo@studyvision.com',
-      plan: SubscriptionPlan.PRO,
-      planExpiresAt: new Date('2027-01-01'),
+      subscriptionPlan: SubscriptionPlan.PRO,
+      subscriptionExpiresAt: new Date('2027-01-01'),
     },
   });
 

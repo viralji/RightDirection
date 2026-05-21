@@ -28,7 +28,7 @@ import { env } from './lib/config/env.config';
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
-    JwtModule.register({ secret: env.JWT_ACCESS_SECRET, signOptions: { expiresIn: '15m' } }),
+    JwtModule.register({ global: true, secret: env.JWT_ACCESS_SECRET, signOptions: { expiresIn: '15m' } }),
     AuthModule,
     TenantModule,
     StudentModule,

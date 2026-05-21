@@ -25,7 +25,7 @@ export class TenantService {
         name: true,
         type: true,
         status: true,
-        plan: true,
+        subscriptionPlan: true,
         logoUrl: true,
         primaryColor: true,
         secondaryColor: true,

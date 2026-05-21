@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../lib/prisma.service';
 import { EmailService } from '../../lib/email.service';
 import { env } from '../../lib/config/env.config';
+import { SubscriptionPlan } from '@prisma/client';
 import * as crypto from 'crypto';
 
 const PLAN_LIMITS = {
@@ -63,8 +64,9 @@ export class BillingService {
   }
 
   async handleWebhook(rawBody: string, signature: string) {
+    const secret = env.RAZORPAY_KEY_SECRET ?? '';
     const expectedSig = crypto
-      .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
+      .createHmac('sha256', secret)
       .update(rawBody)
       .digest('hex');
 
@@ -187,10 +189,10 @@ export class BillingService {
     };
   }
 
-  private parsePlanFromId(planId: string): string {
-    if (planId.includes('enterprise')) return 'ENTERPRISE';
-    if (planId.includes('pro')) return 'PRO';
-    if (planId.includes('starter')) return 'STARTER';
-    return 'TRIAL';
+  private parsePlanFromId(planId: string): SubscriptionPlan {
+    if (planId.includes('enterprise')) return SubscriptionPlan.ENTERPRISE;
+    if (planId.includes('pro')) return SubscriptionPlan.PRO;
+    if (planId.includes('starter')) return SubscriptionPlan.STARTER;
+    return SubscriptionPlan.TRIAL;
   }
 }

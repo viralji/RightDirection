@@ -13,28 +13,34 @@ export class S3Service {
   private client: S3Client;
   private bucket: string;
 
+  private isConfigured: boolean;
+
   constructor() {
+    this.isConfigured = !!(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_S3_BUCKET);
+    this.bucket = env.AWS_S3_BUCKET ?? 'dev-bucket';
     this.client = new S3Client({
       region: env.AWS_REGION,
-      credentials: {
+      credentials: this.isConfigured ? {
         accessKeyId: env.AWS_ACCESS_KEY_ID!,
         secretAccessKey: env.AWS_SECRET_ACCESS_KEY!,
-      },
+      } : { accessKeyId: 'dev', secretAccessKey: 'dev' },
     });
-    this.bucket = env.AWS_S3_BUCKET!;
   }
 
   async getPresignedUploadUrl(key: string, contentType: string, expiresIn = 300) {
-    const command = new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      ContentType: contentType,
-    });
+    if (!this.isConfigured) {
+      // Return a mock URL in dev — allows testing flow without real S3
+      return { url: `http://localhost:4000/dev-upload?key=${encodeURIComponent(key)}`, key };
+    }
+    const command = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType });
     const url = await getSignedUrl(this.client, command, { expiresIn });
     return { url, key };
   }
 
   async getPresignedDownloadUrl(key: string, expiresIn = 3600) {
+    if (!this.isConfigured) {
+      return `http://localhost:4000/dev-download?key=${encodeURIComponent(key)}`;
+    }
     const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
     return getSignedUrl(this.client, command, { expiresIn });
   }

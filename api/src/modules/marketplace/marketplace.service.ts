@@ -73,7 +73,7 @@ export class MarketplaceService {
     // Deduct from wallet and create unlock record in a transaction
     const agent = await this.prisma.agent.findUnique({ where: { tenantId } });
     if (!agent) throw new ForbiddenException('Agent record not found');
-    if (agent.walletBalance < lead.unlockPrice) {
+    if (Number(agent.walletBalance) < lead.unlockPrice) {
       throw new ForbiddenException('Insufficient wallet balance');
     }
 

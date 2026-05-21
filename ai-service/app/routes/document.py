@@ -81,18 +81,20 @@ async def fraud_check(req: DocumentFraudRequest):
         extracted_text = "[No S3 key provided — cannot extract text]"
         metadata_str = "{}"
 
-    prompt = DOCUMENT_FRAUD_PROMPT.format(
-        category=req.category,
-        extracted_text=extracted_text,
-        metadata=metadata_str,
-    )
-
-    result_text = await claude_complete(prompt, max_tokens=500)
-
     try:
-        result = json.loads(result_text)
-    except json.JSONDecodeError:
-        result = {"fraud_score": 0, "risk_level": "LOW", "flags": [], "summary": "Analysis pending"}
+        prompt = DOCUMENT_FRAUD_PROMPT.format(
+            category=req.category,
+            extracted_text=extracted_text,
+            metadata=metadata_str,
+        )
+        result_text = await claude_complete(prompt, max_tokens=500)
+        try:
+            result = json.loads(result_text)
+        except json.JSONDecodeError:
+            result = {"fraud_score": 0, "risk_level": "LOW", "flags": [], "summary": "Analysis pending"}
+    except RuntimeError as e:
+        # AI key not configured — return safe default
+        result = {"fraud_score": 0, "risk_level": "LOW", "flags": [], "summary": f"AI analysis unavailable: {e}"}
 
     return {
         "document_id": req.document_id,
