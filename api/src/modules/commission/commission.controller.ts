@@ -24,6 +24,13 @@ export class CommissionController {
     return { data };
   }
 
+  @Get('analytics')
+  @Roles(UserRole.AGENT_OWNER)
+  async analytics(@Tenant() tenantId: string) {
+    const data = await this.commissions.agentAnalytics(tenantId);
+    return { data };
+  }
+
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
   async create(@Tenant() tenantId: string, @Body() dto: any) {

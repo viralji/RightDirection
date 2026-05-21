@@ -11,14 +11,42 @@ import { UserRole } from '@prisma/client';
 export class StudentController {
   constructor(private students: StudentService) {}
 
+  @Get('me/dashboard')
+  @Roles(UserRole.STUDENT)
+  async myDashboard(@CurrentUser() user: any) {
+    const data = await this.students.getMyDashboard(user.sub);
+    return { data };
+  }
+
+  @Get('me/journey')
+  @Roles(UserRole.STUDENT)
+  async myJourney(@CurrentUser() user: any) {
+    const data = await this.students.getMyJourney(user.sub);
+    return { data };
+  }
+
+  @Get('me/profile')
+  @Roles(UserRole.STUDENT)
+  async myProfile(@CurrentUser() user: any) {
+    const data = await this.students.findByUserId(user.sub);
+    return { data };
+  }
+
   @Get()
-  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR)
+  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR, UserRole.AGENT_TELECALLER)
   async list(@Tenant() tenantId: string, @Query() query: any) {
     return this.students.list(tenantId, query);
   }
 
+  @Get(':id/journey')
+  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR, UserRole.AGENT_TELECALLER)
+  async journey(@Tenant() tenantId: string, @Param('id') id: string) {
+    const data = await this.students.getJourney(tenantId, id);
+    return { data };
+  }
+
   @Get(':id')
-  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR)
+  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR, UserRole.AGENT_TELECALLER)
   async findOne(@Tenant() tenantId: string, @Param('id') id: string) {
     const data = await this.students.findOne(tenantId, id);
     return { data };

@@ -1,4 +1,9 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+// Browser: same-origin /api/v1 (Next.js rewrite → Nest) so httpOnly auth cookies work on :3000.
+// Server (SSR): call API directly.
+const API_BASE =
+  typeof window !== 'undefined'
+    ? '/api/v1'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public details?: any) {
@@ -22,6 +27,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(res.status, json.code || 'ERROR', json.error || 'Request failed', json.details);
   }
 
+  // Paginated list endpoints return { data: T[], meta } at the top level
+  if (json.meta !== undefined && Array.isArray(json.data)) {
+    return { data: json.data, meta: json.meta } as T;
+  }
+
   return json.data as T;
 }
 
@@ -37,6 +47,18 @@ export const auth = {
   logout: () => post('/auth/logout'),
   me: () => get<User>('/auth/me'),
   refresh: () => post<{ user: User }>('/auth/refresh'),
+  stopImpersonation: () =>
+    post<{ user: User; redirectPath: string; impersonating: boolean }>('/auth/impersonate/stop'),
+};
+
+// ─── ADMIN ───────────────────────────────────────────────────────────────────
+export const admin = {
+  demoPersonas: () => get<DemoPersona[]>('/admin/demo-personas'),
+  impersonate: (email: string) =>
+    post<{ user: User; redirectPath: string; personaLabel: string; impersonating: boolean }>(
+      '/admin/impersonate',
+      { email },
+    ),
 };
 
 // ─── TENANTS ─────────────────────────────────────────────────────────────────
@@ -51,7 +73,11 @@ export const students = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return get<PaginatedResponse<Student>>(`/students${qs}`);
   },
-  findOne: (id: string) => get<Student>(`/students/${id}`),
+  findOne: (id: string) => get<StudentDetail>(`/students/${id}`),
+  journey: (id: string) => get<StudentJourneyResponse>(`/students/${id}/journey`),
+  meDashboard: () => get<StudentDashboardResponse>('/students/me/dashboard'),
+  meJourney: () => get<StudentJourneyResponse>('/students/me/journey'),
+  meProfile: () => get<StudentDetail>('/students/me/profile'),
   create: (data: Partial<Student>) => post<Student>('/students', data),
   update: (id: string, data: Partial<Student>) => patch<Student>(`/students/${id}`, data),
 };
@@ -150,6 +176,14 @@ export interface User {
   role: string;
   tenantId: string;
   avatarUrl?: string;
+  impersonating?: boolean;
+}
+
+export interface DemoPersona {
+  email: string;
+  label: string;
+  role: string;
+  redirectPath: string;
 }
 
 export interface TenantBranding {
@@ -171,15 +205,74 @@ export interface Student {
   tenantId: string;
   educationLevel?: string;
   aggregatePct?: number;
+  stream?: string;
   ieltsScore?: number;
   pteScore?: number;
+  greScore?: number;
+  toeflScore?: number;
   annualBudgetInr?: number;
   preferredCountries: string[];
   preferredField: string[];
   preferredIntake?: string;
   profileScore: number;
   leadSource?: string;
+  leadQualityScore?: number;
+  profileDetails?: Record<string, unknown>;
+  counselorNotes?: string;
   createdAt: string;
+}
+
+export interface StudentDetail extends Student {
+  agent?: { businessName: string; city?: string };
+  applications?: Application[];
+  proposals?: any[];
+  documents?: any[];
+  trustScore?: {
+    documentScore?: number;
+    financialScore?: number;
+    academicScore?: number;
+    overallScore?: number;
+    riskLevel?: string;
+  };
+  journeyEvents?: JourneyEvent[];
+}
+
+export interface JourneyEvent {
+  id: string;
+  type: string;
+  icon?: string;
+  title: string;
+  description?: string;
+  occurredAt: string;
+  applicationId?: string;
+  actorName?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface StudentJourneyResponse {
+  student: { id: string; name: string; email: string };
+  stats: {
+    totalEvents: number;
+    applications: number;
+    activeStage: string | null;
+    daysWithAgency: number;
+  };
+  events: JourneyEvent[];
+  applications: Application[];
+}
+
+export interface StudentDashboardResponse {
+  student: StudentDetail;
+  summary: {
+    profileScore: number;
+    applicationsCount: number;
+    documentsCount: number;
+    proposalsCount: number;
+    trustOverall: number | null;
+    unreadNotifications: number;
+    preferredCountries: string[];
+    preferredIntake?: string;
+  };
 }
 
 export interface University {
@@ -187,26 +280,97 @@ export interface University {
   name: string;
   country: string;
   city: string;
+  stateProvince?: string;
+  website?: string;
   logoUrl?: string;
+  bannerUrl?: string;
+  overview?: string;
+
+  // Profile
+  type?: string;
+  foundedYear?: number;
+  totalStudents?: number;
+  internationalStudentPct?: number;
+  campusType?: string;
+  accreditations?: string[];
+
+  // Rankings
   qsWorldRank?: number;
+  timesHigherRank?: number;
+  shanghaiRank?: number;
+  nirf?: number;
+
+  // Financials
+  applicationFeeUsd?: number;
+  livingCostAnnualUsd?: number;
+  dormAvailable?: boolean;
+  dormCostAnnualUsd?: number;
+
+  // Scholarships
+  scholarshipAvailable?: boolean;
+  scholarshipInfo?: string;
+
+  // Post-study & visa
+  postStudyWorkYears?: number;
   visaSuccessRate?: number;
-  defaultCommissionPct?: number;
+  avgPostStudySalaryUsd?: number;
+
+  // Partner info
   isPartner: boolean;
+  defaultCommissionPct?: number;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+
+  // Social
+  instagramUrl?: string;
+  linkedinUrl?: string;
+  youtubeUrl?: string;
+
   courses?: Course[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Course {
   id: string;
   universityId: string;
   name: string;
+  overview?: string;
   level: string;
   field: string;
+  specializations?: string[];
   durationMonths: number;
+  languageOfInstruction?: string;
   intakes: string[];
   tuitionFeeUsd: number;
-  commissionPct?: number;
-  minIelts?: number;
+  currency?: string;
+  localFee?: number;
+  applicationFeeUsd?: number;
   minGradePercent?: number;
+  minIelts?: number;
+  minPte?: number;
+  minToefl?: number;
+  minDuolingo?: number;
+  minGre?: number;
+  minGmat?: number;
+  workExperienceYears?: number;
+  scholarshipAvailable?: boolean;
+  scholarshipAmountUsd?: number;
+  scholarshipInfo?: string;
+  coopAvailable?: boolean;
+  onlineAvailable?: boolean;
+  commissionPct?: number;
+  applicationDeadline?: string;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export interface ApplicationStageHistory {
+  id: string;
+  stage: string;
+  note?: string;
+  createdAt: string;
 }
 
 export interface Application {
@@ -214,7 +378,7 @@ export interface Application {
   studentId: string;
   student: Student;
   courseId: string;
-  course: Course;
+  course: Course & { annualFeeUsd?: number };
   universityId: string;
   university: University;
   stage: string;
@@ -222,6 +386,8 @@ export interface Application {
   priority: boolean;
   offerLetterUrl?: string;
   visaDecision?: string;
+  notes?: string;
+  stageHistory?: ApplicationStageHistory[];
   createdAt: string;
   updatedAt: string;
 }

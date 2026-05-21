@@ -6,9 +6,11 @@ import { ApplicationStage } from '@prisma/client';
 export class ApplicationService {
   constructor(private prisma: PrismaService) {}
 
-  async list(tenantId: string, filters: { studentId?: string; stage?: ApplicationStage; page?: number; pageSize?: number }) {
+  async list(tenantId: string, filters: { studentId?: string; stage?: ApplicationStage; page?: number | string; pageSize?: number | string }) {
     await this.prisma.setTenantContext(tenantId);
-    const { page = 1, pageSize = 50, studentId, stage } = filters;
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 50));
+    const { studentId, stage } = filters;
     const skip = (page - 1) * pageSize;
 
     const where: any = { tenantId };

@@ -201,22 +201,43 @@ model Agent {
   city             String
   state            String?
   pincode          String?
+  address          String?
+  websiteUrl       String?
   gstNumber        String?
   panNumber        String?
+
+  // Business profile
+  yearsInBusiness  Int?
+  teamSize         Int?             // Total counselors/staff
+  specializations  String[]         // e.g. ["Canada", "UK", "Australia"]
+  languages        String[]         // Languages spoken
+  registrationNo   String?          // AISEC / state registration
+
+  // KYC lifecycle
   kycStatus        KYCStatus        @default(PENDING)
   kycRejectedReason String?
+  kycNotes         String?          // Admin internal notes
+  kycSubmittedAt   DateTime?        // When agent submitted docs
+  kycReviewedAt    DateTime?        // When admin reviewed
+
+  // Hierarchy
   parentAgentId    String?
   parentAgent      Agent?           @relation("SubAgents", fields: [parentAgentId], references: [id])
   subAgents        Agent[]          @relation("SubAgents")
 
+  // Performance (computed periodically)
   visaSuccessRate  Float?
-  conversionRate   Float?
+  conversionRate   Float?           // Leads → Enrolled %
   fraudIncidents   Int              @default(0)
-  agentScore       Float?
+  agentScore       Float?           // Platform trust score 0-100
   isBadgeVerified  Boolean          @default(false)
 
+  // Financials
   walletBalance    Decimal          @default(0) @db.Decimal(12, 2)
   totalEarned      Decimal          @default(0) @db.Decimal(12, 2)
+  bankAccountName  String?
+  bankAccountNo    String?
+  bankIFSC         String?
 
   kycDocuments     Document[]       @relation("AgentKYCDocuments")
   students         Student[]
@@ -235,23 +256,53 @@ model University {
   name                 String
   country              String
   city                 String
+  stateProvince        String?
   website              String?
   logoUrl              String?
   bannerUrl            String?
+  overview             String?   // About / description
 
+  // Type & profile
+  type                 String?   // PUBLIC, PRIVATE, PUBLIC_RESEARCH, PRIVATE_RESEARCH
+  foundedYear          Int?
+  totalStudents        Int?
+  internationalStudentPct Float?  // e.g. 0.25 = 25%
+  campusType           String?   // URBAN, SUBURBAN, RURAL, ONLINE
+  accreditations       String[]  // e.g. ["AACSB", "EQUIS"]
+
+  // Rankings
   qsWorldRank          Int?
   timesHigherRank      Int?
   shanghaiRank         Int?
+  nirf                 Int?      // National Institutional Ranking (India context)
 
+  // Financials
+  applicationFeeUsd    Decimal?  @db.Decimal(8, 2)
+  livingCostAnnualUsd  Int?
+  dormAvailable        Boolean   @default(false)
+  dormCostAnnualUsd    Int?
+
+  // Scholarships
+  scholarshipAvailable Boolean   @default(false)
+  scholarshipInfo      String?
+
+  // Post-study work
+  postStudyWorkYears   Float?    // e.g. UK=2, Canada=3, Aus=2-4
   visaSuccessRate      Float?
   avgPostStudySalaryUsd Int?
-  livingCostAnnualUsd  Int?
 
+  // Partner info
   isPartner            Boolean   @default(false)
   partnerSince         DateTime?
   defaultCommissionPct Float?    @default(15)
   contactEmail         String?
   contactName          String?
+  contactPhone         String?
+
+  // Social / media
+  instagramUrl         String?
+  linkedinUrl          String?
+  youtubeUrl           String?
 
   tenant               Tenant?
   courses              Course[]
@@ -270,22 +321,41 @@ model Course {
   universityId        String
   university          University  @relation(fields: [universityId], references: [id])
   name                String
-  level               String      // UNDERGRADUATE, POSTGRADUATE, DIPLOMA, PHD
-  field               String
+  overview            String?     // Course description
+  level               String      // UNDERGRADUATE, POSTGRADUATE, DIPLOMA, PHD, CERTIFICATE
+  field               String      // e.g. "Computer Science", "Business", "Engineering"
+  specializations     String[]    // e.g. ["AI/ML", "Data Science"]
   durationMonths      Int
-  intakes             String[]
+  intakes             String[]    // e.g. ["Jan 2025", "Sep 2025"]
+  languageOfInstruction String    @default("English")
+
+  // Fees
   tuitionFeeUsd       Decimal     @db.Decimal(10, 2)
   currency            String      @default("USD")
   localFee            Decimal?    @db.Decimal(10, 2)
+  applicationFeeUsd   Decimal?    @db.Decimal(8, 2)
+
+  // Eligibility
   minGradePercent     Float?
   minIelts            Float?
   minPte              Float?
   minToefl            Float?
+  minDuolingo         Float?
   minGre              Int?
   minGmat             Int?
+  workExperienceYears Float?      // Required work experience (e.g. MBA requires 2 yrs)
+
+  // Scholarships
+  scholarshipAvailable Boolean    @default(false)
+  scholarshipAmountUsd Decimal?   @db.Decimal(10, 2)
+  scholarshipInfo     String?
+
+  // Additional
+  coopAvailable       Boolean     @default(false)  // Co-op / internship integrated
+  onlineAvailable     Boolean     @default(false)
+  applicationDeadline String?
   commissionPct       Float?
   isActive            Boolean     @default(true)
-  applicationDeadline String?
   notes               String?
 
   applications        Application[]
@@ -328,10 +398,15 @@ model Student {
   leadQualityScore  Int?
   profileScore      Int?         @default(0)
 
+  // Extended profile (JSON for flexible demo / intake data)
+  profileDetails    Json?
+  counselorNotes    String?      @db.Text
+
   proposals         Proposal[]
   applications      Application[]
   documents         Document[]
   trustScore        GlobalTrustScore?
+  journeyEvents     StudentJourneyEvent[]
 
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
@@ -401,6 +476,27 @@ model ApplicationStageHistory {
   createdAt     DateTime         @default(now())
 
   @@map("application_stage_history")
+}
+
+// ─── STUDENT JOURNEY (timeline events for agent + student portals) ───────────
+
+model StudentJourneyEvent {
+  id            String   @id @default(uuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tenantId      String
+  type          String   // lead, call, meeting, profile, document, application, stage, proposal, offer, visa, payment, enrolled, ai, note
+  title         String
+  description   String?
+  metadata      Json?
+  occurredAt    DateTime
+  applicationId String?
+  actorName     String?
+  createdAt     DateTime @default(now())
+
+  @@index([studentId, occurredAt])
+  @@index([tenantId])
+  @@map("student_journey_events")
 }
 
 // ─── DOCUMENT ─────────────────────────────────────────────────────────────────

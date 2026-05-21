@@ -6,7 +6,7 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:ai\"",
     "dev:api": "cd api && npm run start:dev",
     "dev:web": "cd web && npm run dev",
-    "dev:ai": "cd ai-service && uvicorn app.main:app --reload --port 8000",
+    "dev:ai": "cd ai-service && ./venv/bin/python -m uvicorn app.main:app --reload --port 8000",
     "build": "npm run build:api && npm run build:web",
     "build:api": "cd api && npm run build",
     "build:web": "cd web && npm run build",

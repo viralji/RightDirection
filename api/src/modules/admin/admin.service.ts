@@ -1,11 +1,41 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../lib/prisma.service';
 import { RedisService } from '../../lib/redis.service';
+import { AuthService } from '../auth/auth.service';
 import { KYCStatus, SubscriptionPlan } from '@prisma/client';
+import { DEMO_PERSONAS, findDemoPersona } from './demo-personas';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private auth: AuthService,
+  ) {}
+
+  listDemoPersonas() {
+    return DEMO_PERSONAS;
+  }
+
+  async impersonate(email: string) {
+    const persona = findDemoPersona(email);
+    if (!persona) throw new BadRequestException('Invalid demo persona');
+
+    const target = await this.prisma.user.findFirst({
+      where: { email: persona.email, isActive: true },
+    });
+    if (!target) throw new NotFoundException(`Demo user not found: ${persona.email}`);
+    if (target.role !== persona.role) {
+      throw new BadRequestException('Demo persona role mismatch — re-run db:seed');
+    }
+
+    const session = await this.auth.createSessionForUser(target.id);
+    return {
+      ...session,
+      redirectPath: persona.redirectPath,
+      personaLabel: persona.label,
+    };
+  }
 
   // ── PLATFORM STATS ─────────────────────────────────────────────────────────
   async platformStats() {
@@ -29,8 +59,10 @@ export class AdminService {
   }
 
   // ── AGENT MANAGEMENT ───────────────────────────────────────────────────────
-  async listAgents(filters: { kycStatus?: KYCStatus; plan?: SubscriptionPlan; page?: number; pageSize?: number }) {
-    const { page = 1, pageSize = 20, kycStatus, plan } = filters;
+  async listAgents(filters: { kycStatus?: KYCStatus; plan?: SubscriptionPlan; page?: number | string; pageSize?: number | string }) {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 20));
+    const { kycStatus, plan } = filters;
     const skip = (page - 1) * pageSize;
     const where: any = {};
     if (kycStatus) where.kycStatus = kycStatus;
@@ -86,8 +118,10 @@ export class AdminService {
   }
 
   // ── UNIVERSITY MANAGEMENT ──────────────────────────────────────────────────
-  async listUniversitiesAdmin(filters: { isPartner?: boolean; page?: number; pageSize?: number }) {
-    const { page = 1, pageSize = 20, isPartner } = filters;
+  async listUniversitiesAdmin(filters: { isPartner?: boolean; page?: number | string; pageSize?: number | string }) {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 20));
+    const { isPartner } = filters;
     const skip = (page - 1) * pageSize;
     const where: any = {};
     if (isPartner !== undefined) where.isPartner = isPartner;
@@ -118,6 +152,129 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+  }
+
+  async getCommissionAnalytics() {
+    const all = await this.prisma.commissionLedger.findMany({
+      include: {
+        agent: { include: { tenant: { select: { name: true } } } },
+        university: { select: { name: true } },
+      },
+    });
+
+    // By agent
+    const agentMap: Record<string, { name: string; total: number; count: number }> = {};
+    // By month (last 12)
+    const monthMap: Record<string, number> = {};
+    // By university
+    const uniMap: Record<string, { name: string; total: number }> = {};
+    // By status
+    const statusMap: Record<string, number> = {};
+    let totalGross = 0;
+    let totalNet = 0;
+    let totalPending = 0;
+    let totalPaid = 0;
+
+    for (const c of all) {
+      const net = Number(c.netPayableInr);
+      const gross = Number(c.grossAmountInr);
+      totalGross += gross;
+      totalNet += net;
+      if (['PENDING', 'UNIVERSITY_PAID', 'APPROVED'].includes(c.status)) totalPending += net;
+      if (c.status === 'PAID_TO_AGENT') totalPaid += net;
+
+      // Agent aggregation
+      const agentName = c.agent?.tenant?.name ?? 'Unknown';
+      const agentKey = c.agentId;
+      if (!agentMap[agentKey]) agentMap[agentKey] = { name: agentName, total: 0, count: 0 };
+      agentMap[agentKey].total += net;
+      agentMap[agentKey].count += 1;
+
+      // Month aggregation
+      const month = c.createdAt.toISOString().slice(0, 7); // YYYY-MM
+      monthMap[month] = (monthMap[month] ?? 0) + net;
+
+      // University aggregation
+      const uniName = c.university?.name ?? 'Unknown';
+      const uniKey = c.universityId ?? 'unknown';
+      if (!uniMap[uniKey]) uniMap[uniKey] = { name: uniName, total: 0 };
+      uniMap[uniKey].total += net;
+
+      // Status aggregation
+      statusMap[c.status] = (statusMap[c.status] ?? 0) + 1;
+    }
+
+    // Build sorted arrays
+    const byAgent = Object.values(agentMap)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10)
+      .map(a => ({ name: a.name, value: Math.round(a.total), count: a.count }));
+
+    // Last 12 months sorted
+    const allMonths = Object.keys(monthMap).sort();
+    const last12 = allMonths.slice(-12);
+    const byMonth = last12.map(m => ({ month: m, value: Math.round(monthMap[m]) }));
+
+    const byUniversity = Object.values(uniMap)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8)
+      .map(u => ({ name: u.name, value: Math.round(u.total) }));
+
+    return {
+      summary: {
+        totalGross: Math.round(totalGross),
+        totalNet: Math.round(totalNet),
+        totalPending: Math.round(totalPending),
+        totalPaid: Math.round(totalPaid),
+        totalTransactions: all.length,
+      },
+      byAgent,
+      byMonth,
+      byUniversity,
+      byStatus: Object.entries(statusMap).map(([status, count]) => ({ status, count })),
+    };
+  }
+
+  async getAgentDetail(agentId: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId },
+      include: {
+        tenant: true,
+        _count: { select: { students: true, commissions: true } },
+        kycDocuments: {
+          select: { id: true, fileName: true, status: true, createdAt: true, s3Key: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    if (!agent) return null;
+
+    // Application stats
+    const [appStats, commissionStats] = await Promise.all([
+      this.prisma.application.groupBy({
+        by: ['stage'],
+        where: { tenantId: agent.tenantId },
+        _count: { stage: true },
+      }),
+      this.prisma.commissionLedger.aggregate({
+        where: { agentId: agent.id },
+        _sum: { grossAmountInr: true, netPayableInr: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    const stageMap: Record<string, number> = {};
+    appStats.forEach(a => { stageMap[a.stage] = a._count.stage; });
+
+    return {
+      ...agent,
+      appStats: stageMap,
+      commissionStats: {
+        totalGross: Number(commissionStats._sum.grossAmountInr ?? 0),
+        totalNet: Number(commissionStats._sum.netPayableInr ?? 0),
+        count: commissionStats._count.id,
+      },
+    };
   }
 
   // ── FRAUD MONITORING ───────────────────────────────────────────────────────
@@ -162,8 +319,10 @@ export class AdminService {
   }
 
   // ── ACTIVITY LOG ──────────────────────────────────────────────────────────
-  async getActivityLog(filters: { page?: number; pageSize?: number; tenantId?: string }) {
-    const { page = 1, pageSize = 50, tenantId } = filters;
+  async getActivityLog(filters: { page?: number | string; pageSize?: number | string; tenantId?: string }) {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 50));
+    const { tenantId } = filters;
     const skip = (page - 1) * pageSize;
     const where: any = {};
     if (tenantId) where.tenantId = tenantId;

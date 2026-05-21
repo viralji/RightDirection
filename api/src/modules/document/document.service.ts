@@ -56,10 +56,25 @@ export class DocumentService {
     });
   }
 
-  async list(tenantId: string, filters: { studentId?: string; applicationId?: string; category?: DocumentCategory }) {
+  async list(tenantId: string, filters: { studentId?: string; applicationId?: string; category?: DocumentCategory; search?: string }) {
     await this.prisma.setTenantContext(tenantId);
+    const where: any = { tenantId, studentId: { not: null } };
+    if (filters.studentId) where.studentId = filters.studentId;
+    if (filters.applicationId) where.applicationId = filters.applicationId;
+    if (filters.category) where.category = filters.category;
+    if (filters.search) {
+      where.OR = [
+        { fileName: { contains: filters.search, mode: 'insensitive' } },
+        { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { student: { user: { name: { contains: filters.search, mode: 'insensitive' } } } },
+      ];
+    }
     return this.prisma.document.findMany({
-      where: { tenantId, ...filters },
+      where,
+      include: {
+        user: { select: { name: true, email: true } },
+        student: { include: { user: { select: { name: true, email: true } } } },
+      },
       orderBy: [{ category: 'asc' }, { version: 'desc' }],
     });
   }

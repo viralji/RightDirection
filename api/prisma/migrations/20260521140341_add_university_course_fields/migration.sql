@@ -1,0 +1,33 @@
+-- AlterTable
+ALTER TABLE "courses" ADD COLUMN     "applicationFeeUsd" DECIMAL(8,2),
+ADD COLUMN     "coopAvailable" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "languageOfInstruction" TEXT NOT NULL DEFAULT 'English',
+ADD COLUMN     "minDuolingo" DOUBLE PRECISION,
+ADD COLUMN     "onlineAvailable" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "overview" TEXT,
+ADD COLUMN     "scholarshipAmountUsd" DECIMAL(10,2),
+ADD COLUMN     "scholarshipAvailable" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "scholarshipInfo" TEXT,
+ADD COLUMN     "specializations" TEXT[],
+ADD COLUMN     "workExperienceYears" DOUBLE PRECISION;
+
+-- AlterTable
+ALTER TABLE "universities" ADD COLUMN     "accreditations" TEXT[],
+ADD COLUMN     "applicationFeeUsd" DECIMAL(8,2),
+ADD COLUMN     "campusType" TEXT,
+ADD COLUMN     "contactPhone" TEXT,
+ADD COLUMN     "dormAvailable" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "dormCostAnnualUsd" INTEGER,
+ADD COLUMN     "foundedYear" INTEGER,
+ADD COLUMN     "instagramUrl" TEXT,
+ADD COLUMN     "internationalStudentPct" DOUBLE PRECISION,
+ADD COLUMN     "linkedinUrl" TEXT,
+ADD COLUMN     "nirf" INTEGER,
+ADD COLUMN     "overview" TEXT,
+ADD COLUMN     "postStudyWorkYears" DOUBLE PRECISION,
+ADD COLUMN     "scholarshipAvailable" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "scholarshipInfo" TEXT,
+ADD COLUMN     "stateProvince" TEXT,
+ADD COLUMN     "totalStudents" INTEGER,
+ADD COLUMN     "type" TEXT,
+ADD COLUMN     "youtubeUrl" TEXT;

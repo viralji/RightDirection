@@ -59,11 +59,33 @@ export class AuthController {
     if (token) await this.auth.logout(token);
     res.clearCookie('access_token');
     res.clearCookie('refresh_token');
+    res.clearCookie('impersonator_refresh_token');
     return { data: { message: 'Logged out' } };
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('impersonate/stop')
+  @HttpCode(200)
+  async stopImpersonation(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const impersonatorRefresh = req.cookies?.impersonator_refresh_token;
+    const currentRefresh = req.cookies?.refresh_token;
+
+    const { accessToken, refreshToken, user } = await this.auth.stopImpersonation(
+      impersonatorRefresh,
+      currentRefresh,
+    );
+
+    res.clearCookie('impersonator_refresh_token');
+    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    return { data: { user, redirectPath: '/admin/dashboard', impersonating: false } };
+  }
+
   @Get('me')
-  async me(@CurrentUser() user: any) {
-    return { data: user };
+  async me(@Req() req: Request, @CurrentUser() user: any) {
+    const impersonating = !!req.cookies?.impersonator_refresh_token;
+    const dbUser = await this.auth.getUserProfile(user.sub);
+    return { data: { ...dbUser, impersonating } };
   }
 }

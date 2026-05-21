@@ -1,10 +1,18 @@
-import { Controller, Get, Patch, Param, Body, Query, UseGuards, Delete } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Patch, Post, Param, Body, Query, Req, Res, UseGuards, HttpCode } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators';
 import { UserRole, KYCStatus, SubscriptionPlan } from '@prisma/client';
+
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
 
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)
@@ -16,6 +24,36 @@ export class AdminController {
   async stats() {
     const data = await this.admin.platformStats();
     return { data };
+  }
+
+  @Get('demo-personas')
+  listDemoPersonas() {
+    return { data: this.admin.listDemoPersonas() };
+  }
+
+  @Post('impersonate')
+  @HttpCode(200)
+  async impersonate(
+    @Body() dto: { email: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const impersonatorRefresh = req.cookies?.refresh_token;
+    if (!impersonatorRefresh) {
+      throw new BadRequestException('No active session');
+    }
+
+    const { accessToken, refreshToken, user, redirectPath, personaLabel } =
+      await this.admin.impersonate(dto.email);
+
+    res.cookie('impersonator_refresh_token', impersonatorRefresh, {
+      ...COOKIE_OPTS,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    return { data: { user, redirectPath, personaLabel, impersonating: true } };
   }
 
   @Get('agents')
@@ -59,6 +97,18 @@ export class AdminController {
   @Get('commissions/pending')
   async pendingCommissions() {
     const data = await this.admin.pendingCommissions();
+    return { data };
+  }
+
+  @Get('commissions/analytics')
+  async commissionAnalytics() {
+    const data = await this.admin.getCommissionAnalytics();
+    return { data };
+  }
+
+  @Get('agents/:agentId/detail')
+  async agentDetail(@Param('agentId') agentId: string) {
+    const data = await this.admin.getAgentDetail(agentId);
     return { data };
   }
 

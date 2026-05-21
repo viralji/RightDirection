@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -121,6 +122,33 @@ export class AuthService {
 
   async logout(refreshToken: string) {
     await this.prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+  }
+
+  /** Issue a full session for a user (super-admin demo impersonation). */
+  async createSessionForUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive) throw new NotFoundException('User not found');
+    return this.generateTokens(user);
+  }
+
+  /** Restore admin session after demo impersonation. */
+  async getUserProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, tenantId: true, avatarUrl: true },
+    });
+    if (!user) throw new UnauthorizedException();
+    return user;
+  }
+
+  async stopImpersonation(impersonatorRefreshToken: string, currentRefreshToken?: string) {
+    if (!impersonatorRefreshToken) {
+      throw new BadRequestException('Not in demo impersonation mode');
+    }
+    if (currentRefreshToken) {
+      await this.logout(currentRefreshToken);
+    }
+    return this.refreshTokens(impersonatorRefreshToken);
   }
 
   private async generateTokens(user: any) {

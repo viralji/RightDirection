@@ -16,7 +16,9 @@ export class UniversityService {
     page?: number;
     pageSize?: number;
   }) {
-    const { page = 1, pageSize = 20, search, country, isPartner } = filters;
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 20));
+    const { search, country, isPartner } = filters;
     const skip = (page - 1) * pageSize;
 
     const where: any = {};

@@ -39,7 +39,8 @@ export class S3Service {
 
   async getPresignedDownloadUrl(key: string, expiresIn = 3600) {
     if (!this.isConfigured) {
-      return `http://localhost:4000/dev-download?key=${encodeURIComponent(key)}`;
+      // Public sample PDF for local dev preview (no AWS credentials required)
+      return 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
     }
     const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
     return getSignedUrl(this.client, command, { expiresIn });

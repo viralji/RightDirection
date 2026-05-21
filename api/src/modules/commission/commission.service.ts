@@ -46,9 +46,11 @@ export class CommissionService {
     });
   }
 
-  async list(tenantId: string, filters: { status?: CommissionStatus; page?: number; pageSize?: number }) {
+  async list(tenantId: string, filters: { status?: CommissionStatus; page?: number | string; pageSize?: number | string }) {
     await this.prisma.setTenantContext(tenantId);
-    const { page = 1, pageSize = 20, status } = filters;
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 20));
+    const { status } = filters;
     const skip = (page - 1) * pageSize;
 
     const where: any = { tenantId };
@@ -91,6 +93,32 @@ export class CommissionService {
       pendingCommission: pending._sum.netPayableInr ?? 0,
       approvedAndPayable: approved._sum.netPayableInr ?? 0,
     };
+  }
+
+  async agentAnalytics(tenantId: string) {
+    await this.prisma.setTenantContext(tenantId);
+    const all = await this.prisma.commissionLedger.findMany({
+      where: { tenantId },
+      include: { university: { select: { name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const monthMap: Record<string, number> = {};
+    const uniMap: Record<string, { name: string; total: number }> = {};
+
+    for (const c of all) {
+      const net = Number(c.netPayableInr);
+      const month = c.createdAt.toISOString().slice(0, 7);
+      monthMap[month] = (monthMap[month] ?? 0) + net;
+      const uniName = c.university?.name ?? 'Unknown';
+      if (!uniMap[uniName]) uniMap[uniName] = { name: uniName, total: 0 };
+      uniMap[uniName].total += net;
+    }
+
+    const byMonth = Object.keys(monthMap).sort().slice(-12).map(m => ({ month: m, value: Math.round(monthMap[m]) }));
+    const byUniversity = Object.values(uniMap).sort((a, b) => b.total - a.total).slice(0, 8).map(u => ({ name: u.name, value: Math.round(u.total) }));
+
+    return { byMonth, byUniversity };
   }
 
   async updateStatus(id: string, status: CommissionStatus, payoutRef?: string) {
