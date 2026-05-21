@@ -1,0 +1,669 @@
+// api/prisma/schema.prisma
+// Single source of truth for all DB models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum TenantType {
+  AGENT
+  UNIVERSITY
+  ADMIN
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  AGENT_OWNER
+  AGENT_MANAGER
+  AGENT_COUNSELOR
+  AGENT_TELECALLER
+  UNIVERSITY_ADMIN
+  UNIVERSITY_STAFF
+  STUDENT
+}
+
+enum KYCStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RE_UPLOAD_REQUIRED
+}
+
+enum SubscriptionPlan {
+  TRIAL
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum ApplicationStage {
+  LEAD
+  DOCS_COLLECTION
+  UNDER_REVIEW
+  SUBMITTED
+  OFFER_RECEIVED
+  VISA_PROCESSING
+  FEES_PAID
+  ENROLLED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DocumentCategory {
+  ACADEMIC
+  TEST_SCORES
+  IDENTITY
+  FINANCIAL
+  APPLICATION
+  VISA
+  KYC
+  OTHER
+}
+
+enum DocumentStatus {
+  NOT_UPLOADED
+  UPLOADED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum CommissionStatus {
+  PENDING
+  UNIVERSITY_PAID
+  APPROVED
+  PAID_TO_AGENT
+  DISPUTED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum AIJobType {
+  PROPOSAL_GENERATION
+  SOP_WRITING
+  DOCUMENT_FRAUD_CHECK
+  VISA_PREDICTION
+  TRUST_SCORE_CALCULATION
+  INTERVIEW_SIMULATION
+}
+
+enum AIJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ─── TENANT ───────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id             String           @id @default(uuid())
+  type           TenantType
+  subdomain      String           @unique
+  name           String
+  email          String           @unique
+  phone          String?
+  country        String           @default("IN")
+  status                String           @default("ACTIVE")
+  subscriptionPlan      SubscriptionPlan @default(TRIAL)
+  subscriptionStatus    String           @default("ACTIVE")
+  subscriptionId        String?          // Razorpay subscription ID
+  subscriptionExpiresAt DateTime?
+
+  logoUrl        String?
+  primaryColor   String?          @default("#2b7cff")
+  secondaryColor String?
+  customDomain   String?          @unique
+
+  universityId   String?          @unique
+  university     University?      @relation(fields: [universityId], references: [id])
+
+  users          User[]
+  agents         Agent[]
+  activityLogs   ActivityLog[]
+  billingHistory BillingHistory[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("tenants")
+}
+
+// ─── USER ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String        @id @default(uuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  email         String
+  phone         String?
+  passwordHash  String?
+  role          UserRole
+  name          String
+  avatarUrl     String?
+  language      String        @default("en")
+  isActive      Boolean       @default(true)
+  lastLoginAt   DateTime?
+  mfaEnabled    Boolean       @default(false)
+  mfaSecret     String?
+
+  student       Student?
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+  documents     Document[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+// ─── AGENT ────────────────────────────────────────────────────────────────────
+
+model Agent {
+  id               String           @id @default(uuid())
+  tenantId         String           @unique
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  businessName     String
+  city             String
+  state            String?
+  pincode          String?
+  gstNumber        String?
+  panNumber        String?
+  kycStatus        KYCStatus        @default(PENDING)
+  kycRejectedReason String?
+  parentAgentId    String?
+  parentAgent      Agent?           @relation("SubAgents", fields: [parentAgentId], references: [id])
+  subAgents        Agent[]          @relation("SubAgents")
+
+  visaSuccessRate  Float?
+  conversionRate   Float?
+  fraudIncidents   Int              @default(0)
+  agentScore       Float?
+  isBadgeVerified  Boolean          @default(false)
+
+  walletBalance    Decimal          @default(0) @db.Decimal(12, 2)
+  totalEarned      Decimal          @default(0) @db.Decimal(12, 2)
+
+  kycDocuments     Document[]       @relation("AgentKYCDocuments")
+  students         Student[]
+  commissions      CommissionLedger[]
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("agents")
+}
+
+// ─── UNIVERSITY ───────────────────────────────────────────────────────────────
+
+model University {
+  id                   String    @id @default(uuid())
+  name                 String
+  country              String
+  city                 String
+  website              String?
+  logoUrl              String?
+  bannerUrl            String?
+
+  qsWorldRank          Int?
+  timesHigherRank      Int?
+  shanghaiRank         Int?
+
+  visaSuccessRate      Float?
+  avgPostStudySalaryUsd Int?
+  livingCostAnnualUsd  Int?
+
+  isPartner            Boolean   @default(false)
+  partnerSince         DateTime?
+  defaultCommissionPct Float?    @default(15)
+  contactEmail         String?
+  contactName          String?
+
+  tenant               Tenant?
+  courses              Course[]
+  applications         Application[]
+  commissions          CommissionLedger[]
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([country])
+  @@map("universities")
+}
+
+model Course {
+  id                  String      @id @default(uuid())
+  universityId        String
+  university          University  @relation(fields: [universityId], references: [id])
+  name                String
+  level               String      // UNDERGRADUATE, POSTGRADUATE, DIPLOMA, PHD
+  field               String
+  durationMonths      Int
+  intakes             String[]
+  tuitionFeeUsd       Decimal     @db.Decimal(10, 2)
+  currency            String      @default("USD")
+  localFee            Decimal?    @db.Decimal(10, 2)
+  minGradePercent     Float?
+  minIelts            Float?
+  minPte              Float?
+  minToefl            Float?
+  minGre              Int?
+  minGmat             Int?
+  commissionPct       Float?
+  isActive            Boolean     @default(true)
+  applicationDeadline String?
+  notes               String?
+
+  applications        Application[]
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([universityId])
+  @@map("courses")
+}
+
+// ─── STUDENT ──────────────────────────────────────────────────────────────────
+
+model Student {
+  id                String       @id @default(uuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id])
+  agentId           String?
+  agent             Agent?       @relation(fields: [agentId], references: [id])
+  tenantId          String
+
+  educationLevel    String?
+  aggregatePct      Float?
+  stream            String?
+  preferredField    String[]
+
+  ieltsScore        Float?
+  pteScore          Float?
+  toeflScore        Int?
+  duolingoScore     Int?
+  greScore          Int?
+  gmatScore         Int?
+  satScore          Int?
+
+  annualBudgetInr   Int?
+  preferredCountries String[]
+  preferredIntake   String?
+
+  leadSource        String?
+  leadQualityScore  Int?
+  profileScore      Int?         @default(0)
+
+  proposals         Proposal[]
+  applications      Application[]
+  documents         Document[]
+  trustScore        GlobalTrustScore?
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([agentId])
+  @@map("students")
+}
+
+// ─── APPLICATION ──────────────────────────────────────────────────────────────
+
+model Application {
+  id                   String           @id @default(uuid())
+  studentId            String
+  student              Student          @relation(fields: [studentId], references: [id])
+  courseId             String
+  course               Course           @relation(fields: [courseId], references: [id])
+  universityId         String
+  university           University       @relation(fields: [universityId], references: [id])
+  agentId              String
+  tenantId             String
+  stage                ApplicationStage @default(LEAD)
+  intake               String?
+  priority             Boolean          @default(false)
+
+  offerLetterUrl       String?
+  offerType            String?
+  offerConditions      String?
+  offerExpiresAt       DateTime?
+
+  visaAppliedAt        DateTime?
+  visaDecision         String?
+  visaRejectedReason   String?
+
+  verifyToken          String?          @unique
+  verifyTokenExpiresAt DateTime?
+
+  handoffRequested     Boolean          @default(false)
+  handoffAssignedTo    String?
+  handoffSlaAt         DateTime?
+  handoffCompletedAt   DateTime?
+
+  visaProbabilityScore Float?
+  enrollmentPredScore  Float?
+
+  commission           CommissionLedger?
+  documents            Document[]
+  stageHistory         ApplicationStageHistory[]
+
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([universityId])
+  @@map("applications")
+}
+
+model ApplicationStageHistory {
+  id            String           @id @default(uuid())
+  applicationId String
+  application   Application      @relation(fields: [applicationId], references: [id])
+  fromStage     ApplicationStage?
+  toStage       ApplicationStage
+  changedById   String
+  note          String?
+  createdAt     DateTime         @default(now())
+
+  @@map("application_stage_history")
+}
+
+// ─── DOCUMENT ─────────────────────────────────────────────────────────────────
+
+model Document {
+  id            String           @id @default(uuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id])
+  tenantId      String
+  studentId     String?
+  student       Student?         @relation(fields: [studentId], references: [id])
+  applicationId String?
+  application   Application?     @relation(fields: [applicationId], references: [id])
+  agentKycId    String?
+  agentKyc      Agent?           @relation("AgentKYCDocuments", fields: [agentKycId], references: [id])
+
+  category      DocumentCategory
+  status        DocumentStatus   @default(UPLOADED)
+  fileName      String
+  fileSize      Int
+  mimeType      String
+  s3Key         String
+  version       Int              @default(1)
+  parentDocId   String?
+
+  fraudScore    Float?
+  riskLevel     RiskLevel?
+  fraudFlags    String[]
+
+  rejectedReason String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+
+  expiresAt     DateTime?        // for tokenized share links
+  shareToken    String?          @unique
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([studentId])
+  @@map("documents")
+}
+
+// ─── PROPOSAL ─────────────────────────────────────────────────────────────────
+
+model Proposal {
+  id              String    @id @default(uuid())
+  studentId       String
+  student         Student   @relation(fields: [studentId], references: [id])
+  tenantId        String
+  createdById     String
+
+  matchedUniversities Json   // Array of { universityId, score, explanation, fees, roi }
+  budgetInr       Int?
+  targetCountries String[]
+  targetIntake    String?
+
+  sopContent      String?   // Tiptap JSON or plain text
+  sopVersion      Int       @default(0)
+
+  pdfS3Key        String?
+  pdfGeneratedAt  DateTime?
+
+  emailSentAt     DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([tenantId])
+  @@map("proposals")
+}
+
+// ─── COMMISSION ───────────────────────────────────────────────────────────────
+
+model CommissionLedger {
+  id              String           @id @default(uuid())
+  applicationId   String           @unique
+  application     Application      @relation(fields: [applicationId], references: [id])
+  universityId    String
+  university      University       @relation(fields: [universityId], references: [id])
+  agentId         String
+  agent           Agent            @relation(fields: [agentId], references: [id])
+  tenantId        String
+
+  grossAmountInr  Decimal          @db.Decimal(12, 2)
+  platformShare   Decimal          @db.Decimal(12, 2)  // 30%
+  agentShare      Decimal          @db.Decimal(12, 2)  // 70%
+  tdsAmount       Decimal          @db.Decimal(12, 2)  // 10% of agent share (194H)
+  netPayableInr   Decimal          @db.Decimal(12, 2)
+
+  status          CommissionStatus @default(PENDING)
+  invoiceUrl      String?
+  payoutRef       String?
+  payoutDate      DateTime?
+
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([agentId])
+  @@map("commission_ledger")
+}
+
+// ─── NOTIFICATION ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id])
+  tenantId  String
+  channel   NotificationChannel @default(IN_APP)
+  title     String
+  body      String
+  metadata  Json?
+  isRead    Boolean             @default(false)
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([userId, isRead])
+  @@index([tenantId])
+  @@map("notifications")
+}
+
+// ─── AI ───────────────────────────────────────────────────────────────────────
+
+model AIJob {
+  id         String      @id @default(uuid())
+  tenantId   String
+  type       AIJobType
+  status     AIJobStatus @default(QUEUED)
+  entityId   String      // studentId, applicationId, etc.
+  input      Json
+  output     Json?
+  error      String?
+  startedAt  DateTime?
+  completedAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([tenantId])
+  @@index([entityId])
+  @@map("ai_jobs")
+}
+
+// ─── TRUST SCORE ──────────────────────────────────────────────────────────────
+
+model GlobalTrustScore {
+  id               String   @id @default(uuid())
+  studentId        String   @unique
+  student          Student  @relation(fields: [studentId], references: [id])
+
+  documentScore    Float?   @default(0)
+  financialScore   Float?   @default(0)
+  academicScore    Float?   @default(0)
+  interviewScore   Float?   @default(0)
+  overallScore     Float?   @default(0)
+  riskLevel        RiskLevel @default(LOW)
+
+  calculatedAt     DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("global_trust_scores")
+}
+
+// ─── ACTIVITY LOG ─────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  action      String
+  entity      String   @map("entity_type")
+  entityId    String
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([entityId])
+  @@map("activity_logs")
+}
+
+// ─── MARKETPLACE ─────────────────────────────────────────────────────────────
+
+model MarketplaceLead {
+  id                    String    @id @default(uuid())
+  name                  String
+  maskedName            String
+  phone                 String
+  email                 String
+  city                  String
+  state                 String
+  fieldOfStudy          String?
+  budgetRange           String?
+  targetIntake          String?
+  preferredDestinations String[]
+  intent                String    @default("WARM") // HOT, WARM, COLD
+  profileScore          Int       @default(0)
+  unlockPrice           Int       @default(999)
+  isPublished           Boolean   @default(true)
+  expiresAt             DateTime
+  createdAt             DateTime  @default(now())
+
+  unlockedBy            LeadUnlock[]
+
+  @@index([intent])
+  @@index([isPublished])
+  @@map("marketplace_leads")
+}
+
+model LeadUnlock {
+  id        String          @id @default(uuid())
+  leadId    String
+  lead      MarketplaceLead @relation(fields: [leadId], references: [id])
+  agentId   String          // tenantId of the agent who unlocked
+  pricePaid Int
+  createdAt DateTime        @default(now())
+
+  @@unique([leadId, agentId])
+  @@index([agentId])
+  @@map("lead_unlocks")
+}
+
+// ─── BILLING ─────────────────────────────────────────────────────────────────
+
+model BillingHistory {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  razorpayPaymentId     String?
+  razorpaySubscriptionId String?
+  amount                Float
+  currency              String   @default("INR")
+  status                String   // PAID, FAILED, REFUNDED
+  description           String?
+  createdAt             DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("billing_history")
+}
+
+// ─── PLATFORM CONFIG ─────────────────────────────────────────────────────────
+
+model PlatformConfig {
+  id                    String   @id @default(uuid())
+  platformSharePct      Float    @default(30)
+  tdsRatePct            Float    @default(10)
+  minPayoutThreshold    Int      @default(5000)
+  payoutCycleDays       Int      @default(30)
+  defaultLeadPrice      Int      @default(999)
+  leadExpiryDays        Int      @default(30)
+  marketplaceEnabled    Boolean  @default(true)
+  trialAiCredits        Int      @default(5)
+  fraudAlertThreshold   Float    @default(0.6)
+  autoFraudFlagEnabled  Boolean  @default(true)
+  planSTARTERPrice      Int      @default(2999)
+  planPROPrice          Int      @default(5999)
+  planENTERPRISEPrice   Int      @default(9999)
+  updatedAt             DateTime @updatedAt
+
+  @@map("platform_config")
+}

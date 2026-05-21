@@ -1,0 +1,24 @@
+{
+  "name": "rightdirection",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:ai\"",
+    "dev:api": "cd api && npm run start:dev",
+    "dev:web": "cd web && npm run dev",
+    "dev:ai": "cd ai-service && uvicorn app.main:app --reload --port 8000",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "cd api && npm run build",
+    "build:web": "cd web && npm run build",
+    "db:migrate": "cd api && npx prisma migrate dev",
+    "db:seed": "cd api && npx prisma db seed",
+    "db:studio": "cd api && npx prisma studio",
+    "db:generate": "cd api && npx prisma generate",
+    "db:reset": "cd api && npx prisma migrate reset",
+    "install:all": "npm install && cd api && npm install && cd ../web && npm install",
+    "lint": "cd api && npm run lint && cd ../web && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

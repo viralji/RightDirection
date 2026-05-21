@@ -1,0 +1,144 @@
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
+import { PrismaService } from '../../lib/prisma.service';
+import { RedisService } from '../../lib/redis.service';
+import { env } from '../../lib/config/env.config';
+import { UserRole, TenantType } from '@prisma/client';
+
+const OTP_TTL = 600; // 10 minutes
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private jwt: JwtService,
+  ) {}
+
+  async sendOtp(phone: string): Promise<void> {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await this.redis.set(`otp:${phone}`, otp, 'EX', OTP_TTL);
+    // TODO: send via Twilio
+    console.log(`OTP for ${phone}: ${otp}`); // dev only
+  }
+
+  async verifyOtp(phone: string, otp: string): Promise<boolean> {
+    const stored = await this.redis.get(`otp:${phone}`);
+    if (!stored || stored !== otp) throw new BadRequestException('Invalid or expired OTP');
+    await this.redis.del(`otp:${phone}`);
+    return true;
+  }
+
+  async registerAgent(dto: {
+    phone: string;
+    otp: string;
+    name: string;
+    email: string;
+    password: string;
+    businessName: string;
+    city: string;
+    subdomain: string;
+  }) {
+    await this.verifyOtp(dto.phone, dto.otp);
+
+    const existingSubdomain = await this.prisma.tenant.findUnique({
+      where: { subdomain: dto.subdomain },
+    });
+    if (existingSubdomain) throw new ConflictException('Subdomain already taken');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    return this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          type: TenantType.AGENT,
+          subdomain: dto.subdomain,
+          name: dto.businessName,
+          email: dto.email,
+          phone: dto.phone,
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          email: dto.email,
+          phone: dto.phone,
+          passwordHash,
+          role: UserRole.AGENT_OWNER,
+          name: dto.name,
+        },
+      });
+
+      await tx.agent.create({
+        data: {
+          tenantId: tenant.id,
+          businessName: dto.businessName,
+          city: dto.city,
+        },
+      });
+
+      return { user, tenant };
+    });
+  }
+
+  async login(email: string, password: string) {
+    const user = await this.prisma.user.findFirst({ where: { email, isActive: true } });
+    if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+    return this.generateTokens(user);
+  }
+
+  async refreshTokens(refreshToken: string) {
+    let payload: any;
+    try {
+      payload = this.jwt.verify(refreshToken, { secret: env.JWT_REFRESH_SECRET });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const stored = await this.prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+    if (!stored || stored.expiresAt < new Date()) throw new UnauthorizedException('Refresh token expired');
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || !user.isActive) throw new UnauthorizedException();
+
+    await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
+    return this.generateTokens(user);
+  }
+
+  async logout(refreshToken: string) {
+    await this.prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+  }
+
+  private async generateTokens(user: any) {
+    const payload = { sub: user.id, tenantId: user.tenantId, role: user.role, email: user.email };
+
+    const accessToken = this.jwt.sign(payload);
+    const refreshToken = this.jwt.sign(payload, {
+      secret: env.JWT_REFRESH_SECRET,
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+    });
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await this.prisma.refreshToken.create({
+      data: { userId: user.id, token: refreshToken, expiresAt },
+    });
+
+    return { accessToken, refreshToken, user: { id: user.id, role: user.role, email: user.email, name: user.name, tenantId: user.tenantId } };
+  }
+}
