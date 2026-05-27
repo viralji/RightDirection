@@ -30,7 +30,11 @@ export class S3Service {
   async getPresignedUploadUrl(key: string, contentType: string, expiresIn = 300) {
     if (!this.isConfigured) {
       // Return a mock URL in dev — allows testing flow without real S3
-      return { url: `http://localhost:4000/dev-upload?key=${encodeURIComponent(key)}`, key };
+      const port = env.PORT ?? 4005;
+      return {
+        url: `http://localhost:${port}/api/v1/documents/dev-upload?key=${encodeURIComponent(key)}`,
+        key,
+      };
     }
     const command = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType });
     const url = await getSignedUrl(this.client, command, { expiresIn });

@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../lib/prisma.service';
 import { RedisService } from '../../lib/redis.service';
 import { env } from '../../lib/config/env.config';
-import { UserRole, TenantType } from '@prisma/client';
+import { UserRole, TenantType, NotificationChannel } from '@prisma/client';
 
 const OTP_TTL = 600; // 10 minutes
 
@@ -35,6 +35,99 @@ export class AuthService {
     if (!stored || stored !== otp) throw new BadRequestException('Invalid or expired OTP');
     await this.redis.del(`otp:${phone}`);
     return true;
+  }
+
+  async loginWithOtp(phone: string, otp: string) {
+    await this.verifyOtp(phone, otp);
+    const user = await this.prisma.user.findFirst({
+      where: { phone, role: UserRole.STUDENT, isActive: true },
+    });
+    if (!user) {
+      throw new NotFoundException(
+        'No student account for this number. Register with your counselor agency code first.',
+      );
+    }
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    return this.generateTokens(user);
+  }
+
+  async registerStudent(dto: {
+    phone: string;
+    otp: string;
+    name: string;
+    email: string;
+    password: string;
+    agentSubdomain: string;
+    preferredCountries?: string[];
+  }) {
+    await this.verifyOtp(dto.phone, dto.otp);
+
+    const existingEmail = await this.prisma.user.findFirst({ where: { email: dto.email } });
+    if (existingEmail) throw new ConflictException('Email already registered');
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { subdomain: dto.agentSubdomain.toLowerCase().trim() },
+      include: { agents: true },
+    });
+    if (!tenant || tenant.type !== TenantType.AGENT || tenant.status === 'SUSPENDED') {
+      throw new BadRequestException('Invalid agency code. Check the subdomain your counselor shared.');
+    }
+    const agent = tenant.agents[0];
+    if (!agent) throw new BadRequestException('Agency is not fully set up yet');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          email: dto.email,
+          phone: dto.phone,
+          passwordHash,
+          role: UserRole.STUDENT,
+          name: dto.name,
+        },
+      });
+
+      const student = await tx.student.create({
+        data: {
+          userId: user.id,
+          agentId: agent.id,
+          tenantId: tenant.id,
+          preferredCountries: dto.preferredCountries ?? [],
+          leadSource: 'B2C_SELF_REGISTER',
+          profileScore: 10,
+        },
+      });
+
+      await tx.studentJourneyEvent.create({
+        data: {
+          studentId: student.id,
+          tenantId: tenant.id,
+          type: 'lead',
+          title: 'Joined RightDirection',
+          description: `Self-registered under ${agent.businessName}`,
+          occurredAt: new Date(),
+          actorName: dto.name,
+          metadata: { source: 'self_register', subdomain: dto.agentSubdomain },
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: user.id,
+          tenantId: tenant.id,
+          title: 'Welcome to RightDirection',
+          body: `Your profile is linked to ${agent.businessName}. Upload documents to get started.`,
+          channel: NotificationChannel.IN_APP,
+        },
+      });
+
+      return { user, student, tenant };
+    });
+
+    await this.prisma.setTenantContext(tenant.id);
+    return this.generateTokens(result.user);
   }
 
   async registerAgent(dto: {

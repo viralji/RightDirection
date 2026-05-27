@@ -7,7 +7,8 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'rightdirection.com';
 
-  const subdomain = hostname.replace(`.${baseDomain}`, '').replace(`:3000`, '');
+  const portSuffix = hostname.match(/:\d+$/)?.[0] ?? '';
+  const subdomain = hostname.replace(`.${baseDomain}`, '').replace(portSuffix, '');
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-subdomain', subdomain);
@@ -32,7 +33,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (isAuthPage && hasToken) {
-    return NextResponse.redirect(new URL('/agent/dashboard', request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return response;

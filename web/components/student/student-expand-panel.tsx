@@ -93,7 +93,7 @@ export function StudentExpandPanel({
       <TabPills
         tabs={tabs}
         active={tab}
-        onChange={setTab}
+        onChange={(t) => setTab(t)}
         counts={{
           Journey: journey?.stats?.totalEvents,
           Documents: docs.length,

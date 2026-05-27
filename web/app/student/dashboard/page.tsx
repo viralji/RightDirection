@@ -52,9 +52,14 @@ export default function StudentDashboard() {
             {s?.annualBudgetInr ? ` · ${formatCurrency(s.annualBudgetInr)}` : ''}
           </span>
         ) : null}
-        <Link href="/student/journey" className={cn(st.link, 'ml-auto shrink-0')}>
-          Full journey →
-        </Link>
+        <div className="ml-auto flex gap-3 shrink-0">
+          <Link href="/student/documents" className={st.link}>
+            Documents →
+          </Link>
+          <Link href="/student/journey" className={st.link}>
+            Journey →
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white border border-surface-border rounded-lg overflow-hidden shadow-card text-sm">

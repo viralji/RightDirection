@@ -1025,8 +1025,8 @@ async function printSummary() {
   console.log('  Uni (Herts)     admin@herts.university.demo     Demo@123');
   console.log('  Uni (Coventry)  admin@coventry.university.demo  Demo@123');
   console.log('');
-  console.log('  Admin portal:  http://localhost:3000/admin/dashboard');
-  console.log('  Agent portal:  http://localhost:3000/agent/dashboard');
+  console.log('  Admin portal:  http://localhost:5175/admin/dashboard');
+  console.log('  Agent portal:  http://localhost:5175/agent/dashboard');
 }
 
 async function main() {

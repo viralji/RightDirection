@@ -20,6 +20,7 @@ const config: Config = {
         },
         surface: {
           DEFAULT: '#f4f6fb',
+          bg: '#f4f6fb',
           card: '#ffffff',
           card2: '#eef2f8',
           border: '#e2e8f2',
@@ -55,7 +56,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         card: '0 1px 3px 0 rgb(26 35 50 / 0.06), 0 1px 2px -1px rgb(26 35 50 / 0.04)',

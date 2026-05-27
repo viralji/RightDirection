@@ -1,9 +1,9 @@
-// Browser: same-origin /api/v1 (Next.js rewrite → Nest) so httpOnly auth cookies work on :3000.
+// Browser: same-origin /api/v1 (Next.js rewrite → Nest) so httpOnly auth cookies work on :5175.
 // Server (SSR): call API directly.
 const API_BASE =
   typeof window !== 'undefined'
     ? '/api/v1'
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4005/api/v1';
 
 class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public details?: any) {
@@ -42,8 +42,19 @@ const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 export const auth = {
-  sendOtp: (phone: string) => post('/auth/send-otp', { phone }),
+  sendOtp: (phone: string) =>
+    post<{ message: string; devHint?: string }>('/auth/send-otp', { phone }),
   login: (email: string, password: string) => post<{ user: User }>('/auth/login', { email, password }),
+  loginOtp: (phone: string, otp: string) => post<{ user: User }>('/auth/login/otp', { phone, otp }),
+  registerStudent: (data: {
+    phone: string;
+    otp: string;
+    name: string;
+    email: string;
+    password: string;
+    agentSubdomain: string;
+    preferredCountries?: string[];
+  }) => post<{ user: User }>('/auth/register/student', data),
   logout: () => post('/auth/logout'),
   me: () => get<User>('/auth/me'),
   refresh: () => post<{ user: User }>('/auth/refresh'),
@@ -78,6 +89,23 @@ export const students = {
   meDashboard: () => get<StudentDashboardResponse>('/students/me/dashboard'),
   meJourney: () => get<StudentJourneyResponse>('/students/me/journey'),
   meProfile: () => get<StudentDetail>('/students/me/profile'),
+  meDocuments: () => get<StudentDocumentsResponse>('/students/me/documents'),
+  meDocumentsPresign: (data: {
+    category: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }) => post<{ uploadUrl: string; s3Key: string }>('/students/me/documents/presign', data),
+  meDocumentsCreate: (data: {
+    category: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    s3Key: string;
+    parentDocId?: string;
+  }) => post<Document>('/students/me/documents', data),
+  meDocumentDownload: (docId: string) =>
+    get<{ url: string; fileName: string }>(`/students/me/documents/${docId}/download`),
   create: (data: Partial<Student>) => post<Student>('/students', data),
   update: (id: string, data: Partial<Student>) => patch<Student>(`/students/${id}`, data),
 };
@@ -161,6 +189,16 @@ export const billing = {
 };
 
 // ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  readAt?: string | null;
+  channel?: string;
+}
+
 export const notifications = {
   list: (unread = false) => get<Notification[]>(`/notifications${unread ? '?unread=true' : ''}`),
   unreadCount: () => get<{ count: number }>('/notifications/unread-count'),
@@ -259,6 +297,41 @@ export interface StudentJourneyResponse {
   };
   events: JourneyEvent[];
   applications: Application[];
+}
+
+export interface StudentDocumentSlotView {
+  category: string;
+  label: string;
+  description: string;
+  required: boolean;
+  accept: string;
+  status: string;
+  historyCount: number;
+  document: {
+    id: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    status: string;
+    rejectedReason?: string | null;
+    version: number;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+}
+
+export interface StudentDocumentsResponse {
+  studentId: string;
+  slots: StudentDocumentSlotView[];
+  summary: {
+    totalSlots: number;
+    uploaded: number;
+    verified: number;
+    requiredTotal: number;
+    requiredUploaded: number;
+    underReview: number;
+    rejected: number;
+  };
 }
 
 export interface StudentDashboardResponse {

@@ -21,7 +21,15 @@ export class AuthController {
   @Post('send-otp')
   async sendOtp(@Body('phone') phone: string) {
     await this.auth.sendOtp(phone);
-    return { data: { message: 'OTP sent' } };
+    return {
+      data: {
+        message: 'OTP sent',
+        devHint:
+          process.env.NODE_ENV !== 'production'
+            ? 'Check API server console for OTP in development'
+            : undefined,
+      },
+    };
   }
 
   @Public()
@@ -29,6 +37,29 @@ export class AuthController {
   async registerAgent(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.registerAgent(dto);
     return { data: result };
+  }
+
+  @Public()
+  @Post('register/student')
+  @HttpCode(200)
+  async registerStudent(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
+    const { accessToken, refreshToken, user } = await this.auth.registerStudent(dto);
+    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    return { data: { user } };
+  }
+
+  @Public()
+  @Post('login/otp')
+  @HttpCode(200)
+  async loginOtp(
+    @Body() dto: { phone: string; otp: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } = await this.auth.loginWithOtp(dto.phone, dto.otp);
+    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    return { data: { user } };
   }
 
   @Public()

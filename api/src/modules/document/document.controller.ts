@@ -1,14 +1,26 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { DocumentService } from './document.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { Public } from '../../common/decorators';
 import { CurrentUser, Tenant } from '../../common/decorators';
 import { DocumentCategory, DocumentStatus } from '@prisma/client';
+import { env } from '../../lib/config/env.config';
 
 @UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('documents')
 export class DocumentController {
   constructor(private documents: DocumentService) {}
+
+  /** Local dev: accept PUT when AWS is not configured (presign points here). */
+  @Public()
+  @Put('dev-upload')
+  devUpload(@Query('key') key: string) {
+    if (env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_S3_BUCKET) {
+      return { ok: false, message: 'Dev upload only when S3 is not configured' };
+    }
+    return { ok: true, key };
+  }
 
   @Post('presign')
   async getPresignedUpload(@Tenant() tenantId: string, @Body() dto: any) {

@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { StudentService } from './student.service';
+import { StudentDocumentsService } from './student-documents.service';
+import { DocumentCategory } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -9,7 +11,10 @@ import { UserRole } from '@prisma/client';
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Controller('students')
 export class StudentController {
-  constructor(private students: StudentService) {}
+  constructor(
+    private students: StudentService,
+    private studentDocuments: StudentDocumentsService,
+  ) {}
 
   @Get('me/dashboard')
   @Roles(UserRole.STUDENT)
@@ -29,6 +34,46 @@ export class StudentController {
   @Roles(UserRole.STUDENT)
   async myProfile(@CurrentUser() user: any) {
     const data = await this.students.findByUserId(user.sub);
+    return { data };
+  }
+
+  @Get('me/documents')
+  @Roles(UserRole.STUDENT)
+  async myDocuments(@CurrentUser() user: any) {
+    const data = await this.studentDocuments.getMyDocuments(user.sub);
+    return { data };
+  }
+
+  @Post('me/documents/presign')
+  @Roles(UserRole.STUDENT)
+  async myDocumentsPresign(@CurrentUser() user: any, @Body() dto: {
+    category: DocumentCategory;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }) {
+    const data = await this.studentDocuments.presignMyDocument(user.sub, dto);
+    return { data };
+  }
+
+  @Post('me/documents')
+  @Roles(UserRole.STUDENT)
+  async myDocumentsCreate(@CurrentUser() user: any, @Body() dto: {
+    category: DocumentCategory;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    s3Key: string;
+    parentDocId?: string;
+  }) {
+    const data = await this.studentDocuments.createMyDocument(user.sub, dto);
+    return { data };
+  }
+
+  @Get('me/documents/:docId/download')
+  @Roles(UserRole.STUDENT)
+  async myDocumentDownload(@CurrentUser() user: any, @Param('docId') docId: string) {
+    const data = await this.studentDocuments.downloadMyDocument(user.sub, docId);
     return { data };
   }
 
