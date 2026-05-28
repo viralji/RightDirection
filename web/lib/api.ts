@@ -103,7 +103,7 @@ export const students = {
     mimeType: string;
     s3Key: string;
     parentDocId?: string;
-  }) => post<Document>('/students/me/documents', data),
+  }) => post<{ id: string; s3Key: string; status: string }>('/students/me/documents', data),
   meDocumentDownload: (docId: string) =>
     get<{ url: string; fileName: string }>(`/students/me/documents/${docId}/download`),
   create: (data: Partial<Student>) => post<Student>('/students', data),

@@ -5,6 +5,7 @@ import { Public, CurrentUser } from '../../common/decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { Throttle } from '@nestjs/throttler';
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -18,6 +19,7 @@ export class AuthController {
   constructor(private auth: AuthService) {}
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('send-otp')
   async sendOtp(@Body('phone') phone: string) {
     await this.auth.sendOtp(phone);
@@ -50,6 +52,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('login/otp')
   @HttpCode(200)
   async loginOtp(
@@ -63,6 +66,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('login')
   @HttpCode(200)
   async login(@Body() dto: { email: string; password: string }, @Res({ passthrough: true }) res: Response) {

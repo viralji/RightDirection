@@ -18,6 +18,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async setTenantContext(tenantId: string) {
-    await this.$executeRaw`SELECT set_config('app.current_tenant', ${tenantId}, true)`;
+    // false = session-level (not local to transaction) so the setting survives the statement
+    await this.$executeRaw`SELECT set_config('app.current_tenant', ${tenantId}::text, false)`;
   }
 }

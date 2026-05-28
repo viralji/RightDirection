@@ -155,83 +155,73 @@ export class AdminService {
   }
 
   async getCommissionAnalytics() {
-    const all = await this.prisma.commissionLedger.findMany({
-      include: {
-        agent: { include: { tenant: { select: { name: true } } } },
-        university: { select: { name: true } },
-      },
-    });
+    // All aggregations run in the DB — no full table scan into memory
+    const [summary, byAgentRaw, byMonthRaw, byUniversityRaw, byStatusRaw] = await Promise.all([
+      this.prisma.$queryRaw<Array<{
+        total_gross: string; total_net: string;
+        total_pending: string; total_paid: string; total_transactions: bigint;
+      }>>`
+        SELECT
+          COALESCE(SUM(gross_amount_inr), 0)::text                                                       AS total_gross,
+          COALESCE(SUM(net_payable_inr), 0)::text                                                        AS total_net,
+          COALESCE(SUM(CASE WHEN status IN ('PENDING','UNIVERSITY_PAID','APPROVED') THEN net_payable_inr ELSE 0 END), 0)::text AS total_pending,
+          COALESCE(SUM(CASE WHEN status = 'PAID_TO_AGENT' THEN net_payable_inr ELSE 0 END), 0)::text    AS total_paid,
+          COUNT(*)                                                                                         AS total_transactions
+        FROM commission_ledger
+      `,
 
-    // By agent
-    const agentMap: Record<string, { name: string; total: number; count: number }> = {};
-    // By month (last 12)
-    const monthMap: Record<string, number> = {};
-    // By university
-    const uniMap: Record<string, { name: string; total: number }> = {};
-    // By status
-    const statusMap: Record<string, number> = {};
-    let totalGross = 0;
-    let totalNet = 0;
-    let totalPending = 0;
-    let totalPaid = 0;
+      this.prisma.$queryRaw<Array<{ agent_name: string; total: string; count: bigint }>>`
+        SELECT t.name AS agent_name,
+               COALESCE(SUM(cl.net_payable_inr), 0)::text AS total,
+               COUNT(cl.id)                                 AS count
+        FROM commission_ledger cl
+        JOIN agents a  ON a.id         = cl.agent_id
+        JOIN tenants t ON t.id         = a.tenant_id
+        GROUP BY t.name
+        ORDER BY SUM(cl.net_payable_inr) DESC
+        LIMIT 10
+      `,
 
-    for (const c of all) {
-      const net = Number(c.netPayableInr);
-      const gross = Number(c.grossAmountInr);
-      totalGross += gross;
-      totalNet += net;
-      if (['PENDING', 'UNIVERSITY_PAID', 'APPROVED'].includes(c.status)) totalPending += net;
-      if (c.status === 'PAID_TO_AGENT') totalPaid += net;
+      this.prisma.$queryRaw<Array<{ month: string; value: string }>>`
+        SELECT TO_CHAR(created_at, 'YYYY-MM')      AS month,
+               COALESCE(SUM(net_payable_inr), 0)::text AS value
+        FROM commission_ledger
+        WHERE created_at >= date_trunc('month', NOW()) - INTERVAL '11 months'
+        GROUP BY month
+        ORDER BY month ASC
+      `,
 
-      // Agent aggregation
-      const agentName = c.agent?.tenant?.name ?? 'Unknown';
-      const agentKey = c.agentId;
-      if (!agentMap[agentKey]) agentMap[agentKey] = { name: agentName, total: 0, count: 0 };
-      agentMap[agentKey].total += net;
-      agentMap[agentKey].count += 1;
+      this.prisma.$queryRaw<Array<{ name: string; value: string }>>`
+        SELECT u.name,
+               COALESCE(SUM(cl.net_payable_inr), 0)::text AS value
+        FROM commission_ledger cl
+        JOIN universities u ON u.id = cl.university_id
+        GROUP BY u.name
+        ORDER BY SUM(cl.net_payable_inr) DESC
+        LIMIT 8
+      `,
 
-      // Month aggregation
-      const month = c.createdAt.toISOString().slice(0, 7); // YYYY-MM
-      monthMap[month] = (monthMap[month] ?? 0) + net;
+      this.prisma.$queryRaw<Array<{ status: string; count: bigint }>>`
+        SELECT status, COUNT(*) AS count
+        FROM commission_ledger
+        GROUP BY status
+      `,
+    ]);
 
-      // University aggregation
-      const uniName = c.university?.name ?? 'Unknown';
-      const uniKey = c.universityId ?? 'unknown';
-      if (!uniMap[uniKey]) uniMap[uniKey] = { name: uniName, total: 0 };
-      uniMap[uniKey].total += net;
-
-      // Status aggregation
-      statusMap[c.status] = (statusMap[c.status] ?? 0) + 1;
-    }
-
-    // Build sorted arrays
-    const byAgent = Object.values(agentMap)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10)
-      .map(a => ({ name: a.name, value: Math.round(a.total), count: a.count }));
-
-    // Last 12 months sorted
-    const allMonths = Object.keys(monthMap).sort();
-    const last12 = allMonths.slice(-12);
-    const byMonth = last12.map(m => ({ month: m, value: Math.round(monthMap[m]) }));
-
-    const byUniversity = Object.values(uniMap)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 8)
-      .map(u => ({ name: u.name, value: Math.round(u.total) }));
+    const s = summary[0];
 
     return {
       summary: {
-        totalGross: Math.round(totalGross),
-        totalNet: Math.round(totalNet),
-        totalPending: Math.round(totalPending),
-        totalPaid: Math.round(totalPaid),
-        totalTransactions: all.length,
+        totalGross:        Math.round(Number(s?.total_gross ?? 0)),
+        totalNet:          Math.round(Number(s?.total_net ?? 0)),
+        totalPending:      Math.round(Number(s?.total_pending ?? 0)),
+        totalPaid:         Math.round(Number(s?.total_paid ?? 0)),
+        totalTransactions: Number(s?.total_transactions ?? 0),
       },
-      byAgent,
-      byMonth,
-      byUniversity,
-      byStatus: Object.entries(statusMap).map(([status, count]) => ({ status, count })),
+      byAgent:      byAgentRaw.map(r => ({ name: r.agent_name, value: Math.round(Number(r.total)), count: Number(r.count) })),
+      byMonth:      byMonthRaw.map(r => ({ month: r.month, value: Math.round(Number(r.value)) })),
+      byUniversity: byUniversityRaw.map(r => ({ name: r.name, value: Math.round(Number(r.value)) })),
+      byStatus:     byStatusRaw.map(r => ({ status: r.status, count: Number(r.count) })),
     };
   }
 

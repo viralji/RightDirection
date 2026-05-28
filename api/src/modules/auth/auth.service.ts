@@ -10,8 +10,17 @@ import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../lib/prisma.service';
 import { RedisService } from '../../lib/redis.service';
+import { TwilioService } from '../../lib/twilio.service';
 import { env } from '../../lib/config/env.config';
 import { UserRole, TenantType, NotificationChannel } from '@prisma/client';
+
+const AGENT_ROLES: UserRole[] = [
+  UserRole.AGENT_OWNER,
+  UserRole.AGENT_MANAGER,
+  UserRole.AGENT_COUNSELOR,
+  UserRole.AGENT_TELECALLER,
+];
+const UNIVERSITY_ROLES: UserRole[] = [UserRole.UNIVERSITY_ADMIN, UserRole.UNIVERSITY_STAFF];
 
 const OTP_TTL = 600; // 10 minutes
 
@@ -21,13 +30,18 @@ export class AuthService {
     private prisma: PrismaService,
     private redis: RedisService,
     private jwt: JwtService,
+    private twilio: TwilioService,
   ) {}
 
   async sendOtp(phone: string): Promise<void> {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await this.redis.set(`otp:${phone}`, otp, 'EX', OTP_TTL);
-    // TODO: send via Twilio
-    console.log(`OTP for ${phone}: ${otp}`); // dev only
+
+    if (this.twilio.isConfigured) {
+      await this.twilio.sendOtp(phone, otp);
+    } else if (env.NODE_ENV !== 'production') {
+      console.log(`[DEV] OTP for ${phone}: ${otp}`);
+    }
   }
 
   async verifyOtp(phone: string, otp: string): Promise<boolean> {
@@ -245,7 +259,31 @@ export class AuthService {
   }
 
   private async generateTokens(user: any) {
-    const payload = { sub: user.id, tenantId: user.tenantId, role: user.role, email: user.email };
+    let agentId: string | undefined;
+    let universityId: string | undefined;
+
+    if (AGENT_ROLES.includes(user.role)) {
+      const agent = await this.prisma.agent.findUnique({
+        where: { tenantId: user.tenantId },
+        select: { id: true },
+      });
+      agentId = agent?.id;
+    } else if (UNIVERSITY_ROLES.includes(user.role)) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: user.tenantId },
+        select: { universityId: true },
+      });
+      universityId = tenant?.universityId ?? undefined;
+    }
+
+    const payload = {
+      sub: user.id,
+      tenantId: user.tenantId,
+      role: user.role,
+      email: user.email,
+      agentId,
+      universityId,
+    };
 
     const accessToken = this.jwt.sign(payload);
     const refreshToken = this.jwt.sign(payload, {

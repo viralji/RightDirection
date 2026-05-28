@@ -124,6 +124,7 @@ export class CommissionService {
   async updateStatus(id: string, status: CommissionStatus, payoutRef?: string) {
     const commission = await this.prisma.commissionLedger.findUnique({ where: { id } });
     if (!commission) throw new NotFoundException('Commission not found');
+    await this.prisma.setTenantContext(commission.tenantId);
 
     const updated = await this.prisma.commissionLedger.update({
       where: { id },
@@ -134,12 +135,12 @@ export class CommissionService {
       },
     });
 
-    // Credit wallet when paid
+    // Credit wallet when paid to agent
     if (status === CommissionStatus.PAID_TO_AGENT) {
       await this.prisma.agent.update({
         where: { id: commission.agentId },
         data: {
-          walletBalance: { decrement: commission.netPayableInr },
+          walletBalance: { increment: commission.netPayableInr },
           totalEarned: { increment: commission.netPayableInr },
         },
       });

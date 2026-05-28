@@ -4,6 +4,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../lib/prisma.service';
 import { RedisService } from '../../lib/redis.service';
+import { TwilioService } from '../../lib/twilio.service';
 import { env } from '../../lib/config/env.config';
 
 @Module({
@@ -14,7 +15,7 @@ import { env } from '../../lib/config/env.config';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, RedisService],
+  providers: [AuthService, PrismaService, RedisService, TwilioService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

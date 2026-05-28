@@ -204,9 +204,11 @@ export class StudentService {
 
   async update(tenantId: string, id: string, dto: any) {
     await this.prisma.setTenantContext(tenantId);
+    // Strip immutable/privileged fields to prevent mass-assignment
+    const { id: _id, tenantId: _t, agentId: _a, userId: _u, ...safe } = dto;
     return this.prisma.student.update({
-      where: { id },
-      data: dto,
+      where: { id, tenantId },
+      data: safe,
     });
   }
 

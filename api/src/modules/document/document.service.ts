@@ -1,8 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../lib/prisma.service';
 import { S3Service } from '../../lib/s3.service';
 import { DocumentCategory, DocumentStatus } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB
 
 @Injectable()
 export class DocumentService {
@@ -15,6 +27,15 @@ export class DocumentService {
     mimeType: string;
     fileSize: number;
   }) {
+    if (!ALLOWED_MIME_TYPES.has(dto.mimeType)) {
+      throw new BadRequestException(
+        `File type "${dto.mimeType}" is not allowed. Accepted: PDF, JPEG, PNG, WEBP, DOC, DOCX.`,
+      );
+    }
+    if (dto.fileSize > MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestException('File size exceeds the 10 MB limit.');
+    }
+
     const uuid = uuidv4();
     const ext = dto.fileName.split('.').pop();
     const s3Key = this.s3.buildDocumentKey(tenantId, dto.studentId, dto.category, `${uuid}.${ext}`);

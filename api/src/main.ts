@@ -8,6 +8,11 @@ import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { env } from './lib/config/env.config';
 import { Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/node';
+
+if (env.SENTRY_DSN) {
+  Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });

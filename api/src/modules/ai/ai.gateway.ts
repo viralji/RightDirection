@@ -13,7 +13,10 @@ import { JwtService } from '@nestjs/jwt';
 import { env } from '../../lib/config/env.config';
 
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: {
+    origin: [env.FRONTEND_URL, new RegExp(`https://.+\\.${env.BASE_DOMAIN.replace('.', '\\.')}$`)],
+    credentials: true,
+  },
   namespace: '/',
 })
 export class AiGateway implements OnGatewayConnection, OnGatewayDisconnect {

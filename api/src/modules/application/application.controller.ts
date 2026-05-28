@@ -25,6 +25,7 @@ export class ApplicationController {
   }
 
   @Get(':id')
+  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR, UserRole.UNIVERSITY_ADMIN, UserRole.UNIVERSITY_STAFF)
   async findOne(@Tenant() tenantId: string, @Param('id') id: string) {
     const data = await this.applications.findOne(tenantId, id);
     return { data };
@@ -38,6 +39,7 @@ export class ApplicationController {
   }
 
   @Patch(':id/stage')
+  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR)
   async changeStage(
     @Tenant() tenantId: string,
     @CurrentUser() user: any,
@@ -49,6 +51,7 @@ export class ApplicationController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.AGENT_OWNER, UserRole.AGENT_MANAGER, UserRole.AGENT_COUNSELOR)
   async update(@Tenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
     const data = await this.applications.update(tenantId, id, dto);
     return { data };

@@ -64,7 +64,7 @@ export class BillingService {
   }
 
   async handleWebhook(rawBody: string, signature: string) {
-    const secret = env.RAZORPAY_KEY_SECRET ?? '';
+    const secret = env.RAZORPAY_WEBHOOK_SECRET ?? '';
     const expectedSig = crypto
       .createHmac('sha256', secret)
       .update(rawBody)
