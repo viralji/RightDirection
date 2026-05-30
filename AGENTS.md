@@ -1,6 +1,6 @@
 # RightDirection — AGENTS.md
 **Quick reference for AI coding agents working on this codebase**
-Last updated: 2026-05-21 (session 3)
+Last updated: 2026-05-30
 
 ---
 
@@ -184,6 +184,20 @@ RAZORPAY_KEY_ID=...
 RAZORPAY_KEY_SECRET=...
 INTERNAL_API_KEY=...   (NestJS → FastAPI auth)
 ```
+
+---
+
+## Production deploy (git only)
+
+Never edit the server tree by hand or rsync. Workflow: develop locally → `git push origin main` → `./scripts/deploy-digitalocean.sh`.
+
+| Item | Value |
+|------|-------|
+| Public URL | http://139.59.87.174:8090 |
+| Server path | `/var/www/rightdirection` |
+| Deploy script | `scripts/deploy-digitalocean.sh` |
+
+Full details: **CLAUDE.md → Production Deploy (Git Only)**.
 
 ---
 

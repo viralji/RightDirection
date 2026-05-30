@@ -1,6 +1,6 @@
 # RightDirection — CLAUDE.md
 **AI-powered Global Admissions Exchange**
-Last updated: 2026-05-21
+Last updated: 2026-05-30
 
 ---
 
