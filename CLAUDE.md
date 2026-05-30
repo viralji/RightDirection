@@ -217,6 +217,9 @@ rightdirection/
 | AI service entry | `ai-service/app/main.py` |
 | AI prompts | `ai-service/app/models/prompts.py` |
 | LLM clients | `ai-service/app/services/llm.py` |
+| Deploy script | `scripts/deploy-digitalocean.sh` |
+| PM2 config | `scripts/ecosystem.config.cjs` |
+| Nginx (IP deploy) | `nginx/rightdirection-ip.conf` |
 
 ---
 
@@ -231,6 +234,50 @@ Primary brand: `#2b7cff` | Surface BG: `#0f1221` | Card: `#151936` | Border: `#1
 2. Commission share: platform takes 30% of university commission per enrollment
 3. Lead unlock fees: ₹500–₹2,000 per B2C lead (Phase 2)
 4. AI tools add-on: ₹999/month (Phase 2)
+
+---
+
+## Production Deploy (Git Only)
+
+**Rule:** All server code comes from GitHub — never edit `/var/www/rightdirection` by hand or rsync. Develop locally, commit, push, then deploy.
+
+### Workflow
+1. Make changes locally (this repo).
+2. `git commit` + `git push origin main`
+3. From repo root: `./scripts/deploy-digitalocean.sh` (optional arg: server IP)
+
+The script SSHs to the droplet and runs `git fetch` + `git reset --hard origin/main` (or `git clone` on first deploy). It builds API/web/AI, runs Prisma migrate + seed, restarts PM2, reloads nginx.
+
+### Server (DigitalOcean)
+| Item | Value |
+|------|-------|
+| Host | `139.59.87.174` |
+| SSH key | `~/.ssh/do_139.59.87.174` → `root@139.59.87.174` |
+| App path | `/var/www/rightdirection` |
+| Git remote | `git@github.com:viralji/RightDirection.git` (`main`) |
+| Public URL | http://139.59.87.174:8090 (nginx on **8090** only — does not touch ClickK `:3000`/`:5001` or liveindus `:8080`) |
+| API (internal) | `127.0.0.1:4005` → proxied as `/api/v1` |
+| Web (internal) | `127.0.0.1:3001` → proxied as `/` |
+| AI (internal) | `127.0.0.1:8000` |
+| Process manager | PM2 — `scripts/ecosystem.config.cjs` |
+| Nginx config | `nginx/rightdirection-ip.conf` |
+
+### Secrets & env
+- Production `.env` lives **only on the server** at `/var/www/rightdirection/.env` (not in git). First deploy creates it if missing; later deploys preserve it (`git clean` excludes `.env`).
+- `FRONTEND_URL` must match the public origin (e.g. `http://139.59.87.174:8090`) so cookies and redirects work on HTTP.
+
+### Verify after deploy
+```bash
+curl http://139.59.87.174:8090/api/v1/health   # database + redis ok
+# On server: git -C /var/www/rightdirection rev-parse --short HEAD  # should match origin/main
+```
+
+**Note:** The droplet has ~2GB RAM. On-server `curl` during deploy may exit 137 (OOM) after a full Next build; PM2/nginx can still be healthy — check from your machine or `pm2 list`.
+
+### Demo credentials (seed)
+- Admin: `admin@rightdirection.com` / `Admin@123`
+- Agent: `owner@studyvision.com` / `Demo@123`
+- Student: `student@example.com` / `Demo@123`
 
 ---
 
