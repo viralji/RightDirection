@@ -2,15 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Shield, AlertTriangle } from 'lucide-react';
+import { admin } from '@/lib/api';
 import { formatDate, cn } from '@/lib/utils';
 
-async function fetchHighRisk() {
-  const res = await fetch('/api/v1/admin/fraud/high-risk', { credentials: 'include' });
-  return (await res.json()).data;
-}
-
 export default function FraudPage() {
-  const { data: docs, isLoading } = useQuery({ queryKey: ['fraud-docs'], queryFn: fetchHighRisk });
+  const { data: docs, isLoading } = useQuery({
+    queryKey: ['fraud-docs'],
+    queryFn: () => admin.fraudHighRisk(),
+  });
 
   return (
     <div className="space-y-6">

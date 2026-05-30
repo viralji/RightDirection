@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
+import { ReturnToAdminButton } from './return-to-admin-button';
 import { useAuthStore } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
@@ -77,12 +78,13 @@ export function PortalHeader({ title, subtitle, accent = 'brand', links, compact
         </nav>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {user && !compact && (
           <span className="hidden sm:block text-xs text-text-muted max-w-[160px] truncate px-2">
             {user.email}
           </span>
         )}
+        <ReturnToAdminButton />
         <button
           type="button"
           onClick={() => logout()}

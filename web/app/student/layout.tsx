@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PortalHeader } from '@/components/layout/portal-header';
-import { ImpersonationBanner } from '@/components/layout/impersonation-banner';
 import { notifications } from '@/lib/api';
+import { useAuthStore } from '@/lib/auth';
 
 const NAV = [
   { label: 'Dashboard', href: '/student/dashboard' },
@@ -14,6 +15,12 @@ const NAV = [
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
+  const { fetchMe } = useAuthStore();
+
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
+
   const { data: unread } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn: () => notifications.unreadCount(),
@@ -28,7 +35,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="min-h-screen bg-surface">
-      <ImpersonationBanner />
       <PortalHeader title="RightDirection" accent="mint" links={nav} compact />
       <main className="w-full px-3 sm:px-4 py-2">{children}</main>
     </div>

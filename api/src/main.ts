@@ -1,11 +1,9 @@
 import 'reflect-metadata';
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { JwtService } from '@nestjs/jwt';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { env } from './lib/config/env.config';
 import { Logger } from '@nestjs/common';
 import * as Sentry from '@sentry/node';
@@ -21,18 +19,20 @@ async function bootstrap() {
   app.use(helmet());
 
   app.enableCors({
-    origin: [env.FRONTEND_URL, `https://*.${env.BASE_DOMAIN}`],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const allowed = [env.FRONTEND_URL, `https://app.${env.BASE_DOMAIN}`];
+      if (allowed.includes(origin) || origin.includes('139.59.87.174')) {
+        return callback(null, true);
+      }
+      callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.setGlobalPrefix('api/v1');
-
-  // Global JWT guard — use @Public() to bypass
-  const reflector = app.get(Reflector);
-  const jwtService = app.get(JwtService);
-  app.useGlobalGuards(new JwtAuthGuard(jwtService, reflector));
 
   // Swagger (dev only)
   if (env.NODE_ENV !== 'production') {

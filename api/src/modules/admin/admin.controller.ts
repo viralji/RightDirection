@@ -6,13 +6,7 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators';
 import { UserRole, KYCStatus, SubscriptionPlan } from '@prisma/client';
-
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-};
+import { AUTH_COOKIE_OPTS } from '../../lib/cookie-options';
 
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)
@@ -38,20 +32,20 @@ export class AdminController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const impersonatorRefresh = req.cookies?.refresh_token;
-    if (!impersonatorRefresh) {
-      throw new BadRequestException('No active session');
+    const adminUserId = (req as any).user?.sub as string | undefined;
+    if (!adminUserId) {
+      throw new BadRequestException('No active session — sign in again as super admin');
     }
 
     const { accessToken, refreshToken, user, redirectPath, personaLabel } =
       await this.admin.impersonate(dto.email);
 
-    res.cookie('impersonator_refresh_token', impersonatorRefresh, {
-      ...COOKIE_OPTS,
+    res.cookie('impersonator_user_id', adminUserId, {
+      ...AUTH_COOKIE_OPTS,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('access_token', accessToken, { ...AUTH_COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...AUTH_COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
 
     return { data: { user, redirectPath, personaLabel, impersonating: true } };
   }

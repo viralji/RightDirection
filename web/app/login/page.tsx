@@ -25,7 +25,13 @@ export default function LoginPage() {
   const afterAuth = (user: { role: string }) => {
     setUser(user as any);
     const redirect = new URLSearchParams(window.location.search).get('redirect');
-    router.push(redirect && redirect.startsWith('/') ? redirect : dashboardPath(user.role));
+    const target =
+      redirect && redirect.startsWith('/')
+        ? redirect
+        : user.role === 'SUPER_ADMIN'
+          ? '/admin/dashboard'
+          : dashboardPath(user.role);
+    router.push(target);
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {

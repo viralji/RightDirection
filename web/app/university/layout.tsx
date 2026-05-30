@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { PortalHeader } from '@/components/layout/portal-header';
-import { ImpersonationBanner } from '@/components/layout/impersonation-banner';
+import { useAuthStore } from '@/lib/auth';
 
 const NAV = [
   { label: 'Dashboard', href: '/university/dashboard' },
@@ -12,9 +13,14 @@ const NAV = [
 ];
 
 export default function UniversityLayout({ children }: { children: React.ReactNode }) {
+  const { fetchMe } = useAuthStore();
+
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
+
   return (
     <div className="min-h-screen bg-surface">
-      <ImpersonationBanner />
       <PortalHeader
         title="RightDirection"
         subtitle="University Portal"

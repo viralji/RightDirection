@@ -6,13 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
-
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-};
+import { AUTH_COOKIE_OPTS } from '../../lib/cookie-options';
 
 @Controller('auth')
 export class AuthController {
@@ -46,8 +40,10 @@ export class AuthController {
   @HttpCode(200)
   async registerStudent(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, user } = await this.auth.registerStudent(dto);
-    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.clearCookie('impersonator_user_id');
+    res.clearCookie('impersonator_refresh_token');
+    res.cookie('access_token', accessToken, { ...AUTH_COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...AUTH_COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
     return { data: { user } };
   }
 
@@ -60,8 +56,8 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, refreshToken, user } = await this.auth.loginWithOtp(dto.phone, dto.otp);
-    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('access_token', accessToken, { ...AUTH_COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...AUTH_COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
     return { data: { user } };
   }
 
@@ -71,8 +67,10 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body() dto: { email: string; password: string }, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, user } = await this.auth.login(dto.email, dto.password);
-    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.clearCookie('impersonator_user_id');
+    res.clearCookie('impersonator_refresh_token');
+    res.cookie('access_token', accessToken, { ...AUTH_COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...AUTH_COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
     return { data: { user } };
   }
 
@@ -82,8 +80,8 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.refresh_token;
     const { accessToken, refreshToken, user } = await this.auth.refreshTokens(token);
-    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('access_token', accessToken, { ...AUTH_COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...AUTH_COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
     return { data: { user } };
   }
 
@@ -95,6 +93,7 @@ export class AuthController {
     res.clearCookie('access_token');
     res.clearCookie('refresh_token');
     res.clearCookie('impersonator_refresh_token');
+    res.clearCookie('impersonator_user_id');
     return { data: { message: 'Logged out' } };
   }
 
@@ -102,24 +101,25 @@ export class AuthController {
   @Post('impersonate/stop')
   @HttpCode(200)
   async stopImpersonation(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const impersonatorRefresh = req.cookies?.impersonator_refresh_token;
+    const impersonatorUserId = req.cookies?.impersonator_user_id;
     const currentRefresh = req.cookies?.refresh_token;
 
     const { accessToken, refreshToken, user } = await this.auth.stopImpersonation(
-      impersonatorRefresh,
+      impersonatorUserId,
       currentRefresh,
     );
 
     res.clearCookie('impersonator_refresh_token');
-    res.cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
-    res.cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.clearCookie('impersonator_user_id');
+    res.cookie('access_token', accessToken, { ...AUTH_COOKIE_OPTS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refresh_token', refreshToken, { ...AUTH_COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
 
     return { data: { user, redirectPath: '/admin/dashboard', impersonating: false } };
   }
 
   @Get('me')
   async me(@Req() req: Request, @CurrentUser() user: any) {
-    const impersonating = !!req.cookies?.impersonator_refresh_token;
+    const impersonating = !!req.cookies?.impersonator_user_id;
     const dbUser = await this.auth.getUserProfile(user.sub);
     return { data: { ...dbUser, impersonating } };
   }

@@ -248,14 +248,24 @@ export class AuthService {
     return user;
   }
 
-  async stopImpersonation(impersonatorRefreshToken: string, currentRefreshToken?: string) {
-    if (!impersonatorRefreshToken) {
-      throw new BadRequestException('Not in demo impersonation mode');
-    }
+  async stopImpersonation(impersonatorUserId: string | undefined, currentRefreshToken?: string) {
     if (currentRefreshToken) {
-      await this.logout(currentRefreshToken);
+      await this.logout(currentRefreshToken).catch(() => undefined);
     }
-    return this.refreshTokens(impersonatorRefreshToken);
+
+    let adminId = impersonatorUserId;
+    if (!adminId) {
+      const admin = await this.prisma.user.findFirst({
+        where: { role: UserRole.SUPER_ADMIN, email: 'admin@rightdirection.com', isActive: true },
+      });
+      adminId = admin?.id;
+    }
+
+    if (!adminId) {
+      throw new BadRequestException('Not in demo mode — sign in as admin@rightdirection.com');
+    }
+
+    return this.createSessionForUser(adminId);
   }
 
   private async generateTokens(user: any) {

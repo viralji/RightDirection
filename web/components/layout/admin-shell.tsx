@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Users, Building2, Wallet, Shield, Settings, ScrollText,
 } from 'lucide-react';
 import { PortalSidebar } from './portal-sidebar';
+import { PortalTopBar } from './portal-top-bar';
 import { DemoPersonaSwitcher } from './demo-persona-switcher';
 import { useAuthStore } from '@/lib/auth';
 
@@ -34,12 +35,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         nav={ADMIN_NAV}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="flex items-center justify-between gap-4 px-6 py-3 border-b border-surface-border bg-white shrink-0">
-          <p className="text-sm text-text-muted hidden sm:block">
-            Product demo — switch persona without separate logins
-          </p>
-          <DemoPersonaSwitcher />
-        </header>
+        <PortalTopBar demoSwitcher={<DemoPersonaSwitcher />} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 bg-surface">{children}</main>
       </div>
     </div>

@@ -11,7 +11,9 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+const AUTH_PATHS = new Set(['/auth/login', '/auth/login/otp', '/auth/refresh', '/auth/register/student']);
+
+async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
@@ -21,15 +23,34 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
 
-  const json = await res.json();
+  const json = await res.json().catch(() => ({}));
+
+  if (res.status === 401 && !retried && !AUTH_PATHS.has(path)) {
+    try {
+      await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return request<T>(path, options, true);
+    } catch {
+      // fall through to error below
+    }
+  }
 
   if (!res.ok) {
-    throw new ApiError(res.status, json.code || 'ERROR', json.error || 'Request failed', json.details);
+    const message = Array.isArray(json.error) ? json.error[0] : json.error || 'Request failed';
+    throw new ApiError(res.status, json.code || 'ERROR', message, json.details);
   }
 
   // Paginated list endpoints return { data: T[], meta } at the top level
   if (json.meta !== undefined && Array.isArray(json.data)) {
     return { data: json.data, meta: json.meta } as T;
+  }
+
+  if (json.data === undefined) {
+    const message = Array.isArray(json.error) ? json.error[0] : json.error || 'Empty API response';
+    throw new ApiError(res.status, json.code || 'ERROR', message, json.details);
   }
 
   return json.data as T;
@@ -63,13 +84,25 @@ export const auth = {
 };
 
 // ─── ADMIN ───────────────────────────────────────────────────────────────────
+export interface AdminPlatformStats {
+  totalTenants: number;
+  totalStudents: number;
+  totalApplications: number;
+  enrolled: number;
+  pendingKyc: number;
+  totalUniversities: number;
+}
+
 export const admin = {
+  stats: () => get<AdminPlatformStats>('/admin/stats'),
   demoPersonas: () => get<DemoPersona[]>('/admin/demo-personas'),
   impersonate: (email: string) =>
     post<{ user: User; redirectPath: string; personaLabel: string; impersonating: boolean }>(
       '/admin/impersonate',
       { email },
     ),
+  fraudHighRisk: () => get<any[]>('/admin/fraud/high-risk'),
+  config: () => get<Record<string, unknown>>('/admin/config'),
 };
 
 // ─── TENANTS ─────────────────────────────────────────────────────────────────

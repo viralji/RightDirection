@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { publicUrl } from '@/lib/public-origin';
 
 const PORTAL_PREFIXES = ['/agent', '/admin', '/university', '/student'];
 
 export function middleware(request: NextRequest) {
   const url = request.nextUrl;
-  const hostname = request.headers.get('host') || '';
+  const hostname =
+    request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '';
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'rightdirection.com';
 
   const portSuffix = hostname.match(/:\d+$/)?.[0] ?? '';
@@ -27,13 +29,13 @@ export function middleware(request: NextRequest) {
     PORTAL_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
 
   if (isProtected && !hasToken) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = publicUrl(request, '/login');
     loginUrl.searchParams.set('redirect', url.pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   if (isAuthPage && hasToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(publicUrl(request, '/dashboard'));
   }
 
   return response;
