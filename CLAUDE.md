@@ -11,19 +11,47 @@ North Star: **Verified Enrolled Students** (students who enrolled via a verified
 
 ---
 
+## Golden Rule — Local → Git → Server
+
+**Every change follows this order. No exceptions.**
+
+```
+1. Develop locally     edit code in this repo
+2. Commit              git add … && git commit
+3. Push                git push origin main        ← GitHub is source of truth
+4. Deploy              npm run deploy              ← server pulls from git only
+```
+
+### Never do this
+- Edit application code on the server (`/var/www/rightdirection`)
+- rsync or scp **code** to the server
+- Deploy before pushing to GitHub
+
+### Only exception
+- **`.env.production`** is copied to the server via scp (secrets are never in git). Use `npm run deploy:env` to update env only.
+
+### Verify sync
+```bash
+npm run sync:status   # local, GitHub, and server commits should match
+```
+
+---
+
 ## Repo Structure
 ```
 rightdirection/
-├── api/              # NestJS backend (port 4000)
-├── web/              # Next.js frontend — all 4 portals
-├── ai-service/       # Python FastAPI AI service (port 8000)
+├── api/              # NestJS backend (local :4005)
+├── web/              # Next.js frontend — all 4 portals (local :5175)
+├── ai-service/       # Python FastAPI AI service (:8000)
 ├── mobile/           # Flutter app (Phase 1)
 ├── scripts/          # Dev/deploy utility scripts
-├── nginx.conf        # Subdomain routing config
-├── .env.example      # Environment variable template
-├── package.json      # Root run scripts (starts all services)
-├── CLAUDE.md         # ← YOU ARE HERE
-└── AGENTS.md         # AI agent task reference
+├── docs/             # Planning archive + test plans (see docs/README.md)
+├── nginx/            # Production nginx config (IP deploy :8090)
+├── .env.example      # Local dev env template
+├── .env.production.example  # Production env template (copy → .env.production)
+├── package.json      # Root run scripts
+├── CLAUDE.md         # ← YOU ARE HERE (source of truth)
+└── AGENTS.md         # AI agent quick reference
 ```
 
 ---
@@ -107,92 +135,16 @@ rightdirection/
 
 ---
 
-## Phase Build Status
+## Build Status
 
-### Phase 1 — Foundation (Months 0–4) 🔄 IN PROGRESS
-- [x] Root repo structure + scripts
-- [x] CLAUDE.md + AGENTS.md created
-- [x] NestJS API scaffold (modules, guards, prisma) — `api/src/`
-- [x] Prisma schema (full — all models, enums, indexes) — `api/prisma/schema.prisma`
-- [x] Auth module (JWT + OTP + refresh tokens) — `api/src/modules/auth/`
-- [x] Tenant module (subdomain routing + branding + Redis cache) — `api/src/modules/tenant/`
-- [x] University marketplace (CRUD + search + courses) — `api/src/modules/university/`
-- [x] Student management CRM (list, create, update, profile score) — `api/src/modules/student/`
-- [x] Application module (kanban, stage history, CRUD) — `api/src/modules/application/`
-- [x] Document management (S3 presign, version control, share tokens) — `api/src/modules/document/`
-- [x] Notification module (in-app, unread count) — `api/src/modules/notification/`
-- [x] Health endpoint — `api/src/modules/health/`
-- [x] Common layer (guards, decorators, filter, interceptor) — `api/src/common/`
-- [x] Lib layer (PrismaService, RedisService, S3Service, env config) — `api/src/lib/`
-- [x] Python FastAPI AI service (proposal engine, SOP writer, fraud check) — `ai-service/`
-- [x] AI Proposal Engine (deterministic matching + Claude explanation) — `ai-service/app/routes/proposal.py`
-- [x] SOP AI (Claude streaming + non-streaming) — `ai-service/app/routes/sop.py`
-- [x] Next.js web scaffold (layout, providers, middleware) — `web/`
-- [x] Agent portal (sidebar, dashboard, students list, kanban board) — `web/app/(agent)/`
-- [x] Login page — `web/app/(auth)/login/page.tsx`
-- [x] B2C Landing page — `web/app/(public)/page.tsx`
-- [x] API client (all endpoints typed) — `web/lib/api.ts`
-- [x] Auth store (Zustand) — `web/lib/auth.ts`
-- [x] Design tokens (Tailwind config) — `web/tailwind.config.ts`
+**Phase 1 + Phase 2: COMPLETE** (as of 2026-06). All core modules, portals, marketplace, billing, trust score, and production deploy pipeline are built.
 
-- [x] Commission module (ledger, wallet, TDS/GST calc) — `api/src/modules/commission/`
-- [x] Admin module (KYC review, platform stats, fraud monitor) — `api/src/modules/admin/`
-- [x] AI module (FastAPI bridge, Socket.io gateway, SSE streaming) — `api/src/modules/ai/`
-- [x] Proposal module (AI generation, SOP save, PDF stub) — `api/src/modules/proposal/`
-- [x] Agent module (profile, team, KYC upload, stats) — `api/src/modules/agent/`
-- [x] Socket.io gateway — `api/src/modules/ai/ai.gateway.ts`
-- [x] DB seed (8 universities + courses, demo agent + student + admin) — `api/prisma/seed.ts`
-- [x] Student portal (layout, dashboard, profile) — `web/app/(student)/`
-- [x] University portal (layout, dashboard, applications) — `web/app/(university)/`
-- [x] Admin portal (layout, dashboard, agents KYC, universities, commissions, fraud) — `web/app/(admin)/`
-- [x] Student detail + add student form — `web/app/(agent)/students/[id]/`, `new/`
-- [x] University marketplace + detail — `web/app/(agent)/universities/`
-- [x] SOP editor with Tiptap + streaming AI — `web/app/(agent)/proposals/[id]/sop/`
-- [x] Proposals list + generate — `web/app/(agent)/proposals/`
-- [x] Commission wallet + ledger page — `web/app/(agent)/commission/`
-- [x] Team management page — `web/app/(agent)/team/`
-- [x] Settings / white-label branding — `web/app/(agent)/settings/`
-- [x] Register page — `web/app/(auth)/register/`
-- [x] Extended API client — commissions, proposals, agent endpoints
+### Optional / future
+- Razorpay payout API (fund transfer to agent bank)
+- Phase 3: Predictive AI, interview trainer, advanced analytics
+- Phase 4: Education loans, forex, insurance, accommodation
 
-### Phase 1 + Phase 2 COMPLETE (as of 2026-05-21 session 3)
-- [x] `api/src/modules/marketplace/` — lead marketplace (list, unlock, wallet deduction)
-- [x] `api/src/modules/billing/` — Razorpay subscription webhook + order creation
-- [x] `api/src/lib/email.service.ts` — Resend email service + HTML templates (welcome, OTP, KYC, commission)
-- [x] Document viewer page — `web/app/(agent)/documents/page.tsx` — table + iframe drawer with presigned URL
-- [x] Application detail page — `web/app/(agent)/applications/[id]/page.tsx` — pipeline timeline + stage history + move stage modal
-- [x] Leads page — `web/app/(agent)/leads/page.tsx` — intent/destination filters, masked PII, unlock flow
-- [x] Billing page — `web/app/(agent)/billing/page.tsx` — plan cards + Razorpay redirect + payment history
-- [x] University portal: agents — `web/app/(university)/agents/page.tsx`
-- [x] University portal: analytics — `web/app/(university)/analytics/page.tsx` — funnel, top courses, top agents
-- [x] University portal: offers — `web/app/(university)/offers/page.tsx` — issue offer / reject flow
-- [x] Admin config page — `web/app/(admin)/config/page.tsx` — all platform settings toggles
-- [x] Activity log viewer — `web/app/(admin)/activity/page.tsx` + `web/components/activity-log.tsx`
-- [x] Phase 2: Document verification AI (AWS Textract) — `ai-service/app/routes/document.py`
-- [x] Phase 2: Trust Score engine — `ai-service/app/services/trust_score.py` + `routes/trust_score.py`
-- [x] Prisma schema additions: MarketplaceLead, LeadUnlock, BillingHistory, PlatformConfig + Tenant subscription fields
-
-### Remaining (optional / future)
-- [ ] Push notifications / email OTP flow in production
-- [ ] Phase 2: Razorpay payout API integration (fund transfer to agent bank)
-- [ ] Phase 3: Predictive AI (visa, enrollment)
-- [ ] Phase 3: AI interview trainer
-
-### Phase 2 — Trust & Monetization (Months 4–8)
-- Document verification AI (AWS Textract + fraud pipeline)
-- Trust Score Engine
-- Commission/wallet engine
-- B2C lead marketplace
-- Razorpay subscription billing
-
-### Phase 3 — Intelligence Layer (Months 8–12)
-- Predictive AI (visa, enrollment)
-- AI interview trainer
-- Analytics dashboards
-- AI counselor copilot
-
-### Phase 4 — Ecosystem Expansion
-- Education loans, forex, insurance, accommodation
+Historical phase checklists and feature lists live in git history; planning blueprints archived under `docs/planning/`.
 
 ---
 
@@ -239,17 +191,16 @@ Primary brand: `#2b7cff` | Surface BG: `#0f1221` | Card: `#151936` | Border: `#1
 
 ---
 
-## Production Deploy (Git Only)
+## Production Deploy
 
-**Rule:** All server code comes from GitHub — never edit `/var/www/rightdirection` by hand or rsync. Develop locally, commit, push, then deploy.
+See **Golden Rule** above. Deploy script: `scripts/deploy-digitalocean.sh` (`npm run deploy`).
 
 ### Workflow
-1. Make changes locally (this repo).
-2. `git commit` + `git push origin main`
-3. Ensure `.env.production` exists locally (gitignored — production secrets/URLs).
-4. From repo root: `./scripts/deploy-digitalocean.sh` (optional arg: server IP)
+1. `git commit` + `git push origin main`
+2. Ensure `.env.production` exists (copy from `.env.production.example`)
+3. `npm run deploy`
 
-The script **scp’s `.env.production` → server `.env`** (only file not from git), then SSHs and runs `git fetch` + `git reset --hard origin/main` (or `git clone` on first deploy). It bootstraps Node/PM2/Postgres/Redis/Nginx on a fresh server, builds API/web/AI, runs Prisma migrate + seed, restarts PM2, reloads nginx.
+The script scp's `.env.production` → server `.env`, then `git clone` / `git reset --hard origin/main`, builds, migrates, seeds, restarts PM2, reloads nginx.
 
 ### Server (DigitalOcean)
 | Item | Value |
