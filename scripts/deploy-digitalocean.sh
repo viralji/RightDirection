@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
-# Deploy RightDirection via git (no rsync). Preserves server .env and other apps on the host.
+# Deploy RightDirection via git (no code rsync). Only .env is copied from local.
 # Usage: ./scripts/deploy-digitalocean.sh [server_ip]
+#   ENV_LOCAL=.env.production ./scripts/deploy-digitalocean.sh
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERVER_IP="${1:-139.59.87.174}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/do_139.59.87.174}"
 REMOTE_DIR="/var/www/rightdirection"
 GIT_REPO="${GIT_REPO:-git@github.com:viralji/RightDirection.git}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
+ENV_LOCAL="${ENV_LOCAL:-$ROOT/.env.production}"
 
 SSH=(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "root@${SERVER_IP}")
+SCP=(scp -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new)
+
+if [ ! -f "$ENV_LOCAL" ]; then
+  echo "ERROR: Missing $ENV_LOCAL — create production env (never commit to git)."
+  exit 1
+fi
+
+echo "==> Push .env from local ($ENV_LOCAL) — code comes from git only"
+"${SSH[@]}" "mkdir -p ${REMOTE_DIR}"
+"${SCP[@]}" "$ENV_LOCAL" "root@${SERVER_IP}:/tmp/rightdirection.env"
 
 echo "==> Deploy ${GIT_BRANCH} from ${GIT_REPO} to ${SERVER_IP}:${REMOTE_DIR}"
 "${SSH[@]}" bash -s <<REMOTE
@@ -17,6 +30,39 @@ set -euo pipefail
 RD=${REMOTE_DIR}
 GIT_REPO='${GIT_REPO}'
 GIT_BRANCH='${GIT_BRANCH}'
+
+# --- Bootstrap (fresh server) ---
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ] 2>/dev/null; then
+  echo "==> Install Node.js 20"
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+fi
+if ! command -v pm2 >/dev/null 2>&1; then
+  echo "==> Install PM2"
+  npm install -g pm2
+fi
+if ! command -v psql >/dev/null 2>&1; then
+  echo "==> Install PostgreSQL"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib
+  systemctl enable postgresql
+  systemctl start postgresql
+fi
+if ! command -v redis-server >/dev/null 2>&1; then
+  echo "==> Install Redis"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server
+fi
+if ! command -v nginx >/dev/null 2>&1; then
+  echo "==> Install Nginx"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
+fi
+systemctl enable redis-server nginx postgresql 2>/dev/null || true
+systemctl start redis-server nginx postgresql 2>/dev/null || true
+
+# pgvector (best-effort)
+apt-get install -y postgresql-16-pgvector 2>/dev/null || \
+  apt-get install -y postgresql-15-pgvector 2>/dev/null || true
 
 # --- Git: clone or pull (source of truth) ---
 if [ -d "\$RD/.git" ]; then
@@ -28,47 +74,15 @@ if [ -d "\$RD/.git" ]; then
   git clean -fd -e .env -e api/.env -e web/.env.local -e node_modules -e api/node_modules -e web/.next -e api/dist -e ai-service/venv
 else
   echo "==> git clone into \$RD"
-  ENV_TMP=""
-  [ -f "\$RD/.env" ] && ENV_TMP=\$(mktemp) && cp "\$RD/.env" "\$ENV_TMP"
   mkdir -p "\$(dirname "\$RD")"
   rm -rf "\$RD"
   git clone --branch "\$GIT_BRANCH" --depth 1 "\$GIT_REPO" "\$RD"
-  if [ -n "\$ENV_TMP" ]; then
-    cp "\$ENV_TMP" "\$RD/.env"
-    rm -f "\$ENV_TMP"
-  fi
 fi
 
-cd "\$RD"
-
-# --- Production .env (never committed) ---
-if [ ! -f "\$RD/.env" ]; then
-  JWT_A=\$(openssl rand -hex 32)
-  JWT_R=\$(openssl rand -hex 32)
-  INT_KEY=\$(openssl rand -hex 32)
-  cat > "\$RD/.env" <<ENV
-NODE_ENV=production
-PORT=4005
-DATABASE_URL=postgresql://rightdirection:rd_prod_change_me@127.0.0.1:5432/rightdirection
-REDIS_URL=redis://127.0.0.1:6379
-JWT_ACCESS_SECRET=\${JWT_A}
-JWT_REFRESH_SECRET=\${JWT_R}
-INTERNAL_API_KEY=\${INT_KEY}
-AI_SERVICE_URL=http://127.0.0.1:8000
-FRONTEND_URL=http://139.59.87.174:8090
-BASE_DOMAIN=rightdirection.com
-EMAIL_FROM=noreply@rightdirection.com
-ENV
-fi
+# --- Production .env (pushed from local, never in git) ---
+cp /tmp/rightdirection.env "\$RD/.env"
+chmod 600 "\$RD/.env"
 ln -sf "\$RD/.env" "\$RD/api/.env"
-
-# --- Redis ---
-if ! command -v redis-server >/dev/null 2>&1; then
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server
-fi
-systemctl enable redis-server 2>/dev/null || true
-systemctl start redis-server 2>/dev/null || true
 
 # --- PostgreSQL (isolated DB) ---
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='rightdirection'" | grep -q 1 || \

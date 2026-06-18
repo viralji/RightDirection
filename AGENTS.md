@@ -1,6 +1,6 @@
 # RightDirection — AGENTS.md
 **Quick reference for AI coding agents working on this codebase**
-Last updated: 2026-05-30
+Last updated: 2026-06-18
 
 ---
 
@@ -75,7 +75,19 @@ Everything from the TODO list is now built. See CLAUDE.md for full checklist.
 ---
 
 ## Architecture in One Paragraph
-NestJS API (port 4000) serves all REST endpoints. Next.js (port 3000) handles all 4 portals via subdomain routing in `middleware.ts`. Python FastAPI (port 8000) handles AI workloads (proposals, SOP, fraud). PostgreSQL is the only database (+ pgvector extension). Redis handles caching + BullMQ job queues + Socket.io pub/sub. No Docker — services run natively. Multi-tenancy via PostgreSQL RLS + tenant_id on all rows.
+NestJS API (local port **4005**, prod internal **4005**) serves all REST endpoints. Next.js (local **5175**, prod internal **3001** behind nginx **8090**) handles all 4 portals via subdomain routing in `middleware.ts`. Python FastAPI (port **8000**) handles AI workloads. PostgreSQL (+ pgvector) is the only database. Redis handles caching + BullMQ + Socket.io pub/sub. No Docker — services run natively via PM2 on production. Multi-tenancy via PostgreSQL RLS + `tenant_id` on all rows.
+
+---
+
+## Source of truth & sync
+
+| Layer | Location | Rule |
+|-------|----------|------|
+| Code | GitHub `main` | Commit + push from local; never edit server code by hand |
+| Server app | `/var/www/rightdirection` | `git clone` / `git reset --hard origin/main` via deploy script |
+| Secrets | `.env.production` (local, gitignored) | **Only** file scp'd to server — copy from `.env.production.example` |
+
+Check sync: `./scripts/sync-status.sh`
 
 ---
 
@@ -166,11 +178,17 @@ async findStudents(tenantId: string, filters: any) {
 ---
 
 ## Environment Variables (key ones)
+
+**Local dev:** copy `.env.example` → `.env` (and `web/.env.local` if needed).  
+**Production:** copy `.env.production.example` → `.env.production` (gitignored). Deploy scp's it to the server.
+
 ```
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://localhost:6379
 JWT_ACCESS_SECRET=...
 JWT_REFRESH_SECRET=...
+FRONTEND_URL=http://localhost:5175          # dev
+FRONTEND_URL=http://139.59.87.174:8090      # prod
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
 AWS_ACCESS_KEY_ID=...
@@ -183,32 +201,56 @@ TWILIO_AUTH_TOKEN=...
 RAZORPAY_KEY_ID=...
 RAZORPAY_KEY_SECRET=...
 INTERNAL_API_KEY=...   (NestJS → FastAPI auth)
+AI_SERVICE_URL=http://localhost:8000        # dev
+AI_SERVICE_URL=http://127.0.0.1:8000        # prod (on server)
 ```
 
 ---
 
 ## Production deploy (git only)
 
-Never edit the server tree by hand or rsync. Workflow: develop locally → `git push origin main` → `./scripts/deploy-digitalocean.sh`.
+Never edit the server tree by hand or rsync code. Workflow:
+
+1. Develop locally → `git commit` → `git push origin main`
+2. Maintain `.env.production` locally (from `.env.production.example`)
+3. `./scripts/deploy-digitalocean.sh` — scp env + git pull + build + PM2 + nginx
 
 | Item | Value |
 |------|-------|
+| SSH | `ssh -i ~/.ssh/do_139.59.87.174 root@139.59.87.174` |
 | Public URL | http://139.59.87.174:8090 |
 | Server path | `/var/www/rightdirection` |
+| Git remote | `git@github.com:viralji/RightDirection.git` (`main`) |
 | Deploy script | `scripts/deploy-digitalocean.sh` |
+| Env only | `scripts/push-env.sh` |
+| Sync check | `scripts/sync-status.sh` |
+| PM2 config | `scripts/ecosystem.config.cjs` |
+| Nginx | `nginx/rightdirection-ip.conf` (port **8090** only) |
+
+Fresh server: deploy script bootstraps Node 20, PM2, PostgreSQL, Redis, nginx, pgvector.
 
 Full details: **CLAUDE.md → Production Deploy (Git Only)**.
+
+### Demo logins (seed)
+- Admin: `admin@rightdirection.com` / `Admin@123`
+- Agent: `owner@studyvision.com` / `Demo@123`
+- Student: `student@example.com` / `Demo@123`
 
 ---
 
 ## Run Commands
 ```bash
-# From repo root
-npm run dev:api      # Start NestJS (port 4000)
-npm run dev:web      # Start Next.js (port 3000)
-npm run dev:ai       # Start FastAPI (port 8000)
-npm run dev          # Start all three
-npm run db:migrate   # prisma migrate dev
-npm run db:seed      # prisma db seed
-npm run db:studio    # prisma studio
+# From repo root — local dev (API :4005, Web :5175, AI :8000)
+npm run dev:api
+npm run dev:web
+npm run dev:ai
+npm run dev
+npm run db:migrate
+npm run db:seed
+npm run db:studio
+
+# Production
+npm run sync:status          # compare local / GitHub / server commits
+npm run deploy               # git deploy + scp .env.production
+npm run deploy:env           # scp .env.production only, restart API
 ```

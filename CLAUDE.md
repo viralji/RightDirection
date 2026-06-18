@@ -1,6 +1,6 @@
 # RightDirection — CLAUDE.md
 **AI-powered Global Admissions Exchange**
-Last updated: 2026-05-30
+Last updated: 2026-06-18
 
 ---
 
@@ -218,6 +218,8 @@ rightdirection/
 | AI prompts | `ai-service/app/models/prompts.py` |
 | LLM clients | `ai-service/app/services/llm.py` |
 | Deploy script | `scripts/deploy-digitalocean.sh` |
+| Push env only | `scripts/push-env.sh` |
+| Sync check | `scripts/sync-status.sh` |
 | PM2 config | `scripts/ecosystem.config.cjs` |
 | Nginx (IP deploy) | `nginx/rightdirection-ip.conf` |
 
@@ -244,9 +246,10 @@ Primary brand: `#2b7cff` | Surface BG: `#0f1221` | Card: `#151936` | Border: `#1
 ### Workflow
 1. Make changes locally (this repo).
 2. `git commit` + `git push origin main`
-3. From repo root: `./scripts/deploy-digitalocean.sh` (optional arg: server IP)
+3. Ensure `.env.production` exists locally (gitignored — production secrets/URLs).
+4. From repo root: `./scripts/deploy-digitalocean.sh` (optional arg: server IP)
 
-The script SSHs to the droplet and runs `git fetch` + `git reset --hard origin/main` (or `git clone` on first deploy). It builds API/web/AI, runs Prisma migrate + seed, restarts PM2, reloads nginx.
+The script **scp’s `.env.production` → server `.env`** (only file not from git), then SSHs and runs `git fetch` + `git reset --hard origin/main` (or `git clone` on first deploy). It bootstraps Node/PM2/Postgres/Redis/Nginx on a fresh server, builds API/web/AI, runs Prisma migrate + seed, restarts PM2, reloads nginx.
 
 ### Server (DigitalOcean)
 | Item | Value |
@@ -263,7 +266,7 @@ The script SSHs to the droplet and runs `git fetch` + `git reset --hard origin/m
 | Nginx config | `nginx/rightdirection-ip.conf` |
 
 ### Secrets & env
-- Production `.env` lives **only on the server** at `/var/www/rightdirection/.env` (not in git). First deploy creates it if missing; later deploys preserve it (`git clean` excludes `.env`).
+- Production env file: **`.env.production`** on your machine (gitignored). Deploy copies it to `/var/www/rightdirection/.env` via scp — never commit it.
 - `FRONTEND_URL` must match the public origin (e.g. `http://139.59.87.174:8090`) so cookies and redirects work on HTTP.
 
 ### Verify after deploy
@@ -282,6 +285,8 @@ curl http://139.59.87.174:8090/api/v1/health   # database + redis ok
 ---
 
 ## Dev Notes
+- **Local dev ports:** API `4005`, Web `5175`, AI `8000` (see `api/package.json`, `web/package.json`)
+- **Production ports:** nginx `:8090` → web `:3001`, api `:4005`, ai `:8000` (see `nginx/rightdirection-ip.conf`)
 - Solo developer / small team — keep it simple, no premature abstraction
 - Reference project: Workflow_App (same patterns for NestJS + Prisma + Next.js)
 - India-first geo: Razorpay for payments, Gupshup for WhatsApp, INR pricing

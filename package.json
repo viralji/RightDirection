@@ -17,7 +17,10 @@
     "db:reset": "cd api && npx prisma migrate reset",
     "install:all": "npm install && cd api && npm install && cd ../web && npm install",
     "lint": "cd api && npm run lint && cd ../web && npm run lint",
-    "test:student-flow": "bash scripts/test-student-flow.sh"
+    "test:student-flow": "bash scripts/test-student-flow.sh",
+    "deploy": "bash scripts/deploy-digitalocean.sh",
+    "deploy:env": "bash scripts/push-env.sh",
+    "sync:status": "bash scripts/sync-status.sh"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
