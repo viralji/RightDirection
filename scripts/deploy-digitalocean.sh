@@ -162,7 +162,10 @@ pm2 delete rightdirection-ai 2>/dev/null || true
 pm2 start scripts/ecosystem.config.cjs
 pm2 save
 
-# --- Nginx (port 8090 only) ---
+# --- Nginx (port 8090 only; remove the default site so nothing listens on :80
+# beyond what UFW already blocks — defense in depth if the firewall is ever
+# misconfigured) ---
+rm -f /etc/nginx/sites-enabled/default
 cp "$RD/nginx/rightdirection-ip.conf" /etc/nginx/sites-available/rightdirection
 ln -sf /etc/nginx/sites-available/rightdirection /etc/nginx/sites-enabled/rightdirection
 nginx -t
