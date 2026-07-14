@@ -88,8 +88,8 @@ npm run deploy           # git pull on server + build + PM2
 npm run deploy:env       # scp .env.production only
 ```
 
-SSH: `ssh -i ~/.ssh/do_139.59.87.174 root@139.59.87.174`  
-Public: http://139.59.87.174:8090
+SSH: `ssh -i ~/.ssh/do_134.209.158.145 root@134.209.158.145`  
+Public: http://134.209.158.145:8090
 
 ### Demo logins (seed)
 | Role | Email | Password |

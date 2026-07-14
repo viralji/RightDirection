@@ -205,43 +205,48 @@ The script scp's `.env.production` → server `.env`, then `git clone` / `git re
 ### Server (DigitalOcean)
 | Item | Value |
 |------|-------|
-| Host | `139.59.87.174` |
-| Specs | 2 vCPU / 3.8GB RAM (upgraded 2026-07-13 from 1 vCPU / 1.9GB) |
-| OS | Ubuntu (whatever image DO gives on rebuild — was 24.04, then 26.04 "resolute" after the 2026-07-13 rebuild; **do not assume a fixed version**, the deploy script bootstraps from scratch each time) |
-| SSH key | `~/.ssh/do_139.59.87.174` → `root@139.59.87.174` (key-only login; password auth is disabled — see Security below) |
+| Host | `134.209.158.145` (replaces the `139.59.87.174` droplet, compromised 2026-07-13 and decommissioned 2026-07-14 — see Security incidents below) |
+| Specs | 2 vCPU / 3.8GB RAM |
+| OS | Ubuntu 24.04.4 LTS (whatever image DO gives on rebuild — **do not assume a fixed version**, the deploy script bootstraps from scratch each time) |
+| SSH key | `~/.ssh/do_134.209.158.145` → `root@134.209.158.145` (key-only login; password auth is disabled — see Security below). Locally this is a copy of the Windows-side key generated at droplet creation (`C:\Users\ViralShah\.ssh\id_ed25519`), stripped of its passphrase so the deploy script can run non-interactively — the original Windows key still has its passphrase. |
 | App path | `/var/www/rightdirection` |
 | Git remote | `git@github.com:viralji/RightDirection.git` (`main`) — pulled via a **per-repo deploy key** generated on the server itself (`/root/.ssh/id_ed25519`), registered read-only under repo Settings → Deploy keys. This key does **not** survive a rebuild — regenerate and re-register it each time (the deploy script prints the new pubkey and exits with instructions if GitHub access fails). |
-| Public URL | http://139.59.87.174:8090 (nginx on **8090** only — does not touch ClickK `:3000`/`:5001` or liveindus `:8080`) |
+| Public URL | http://134.209.158.145:8090 (nginx on **8090** only) |
 | API (internal) | `127.0.0.1:4005` → proxied as `/api/v1` |
 | Web (internal) | `127.0.0.1:3001` → proxied as `/` |
-| AI (internal) | `127.0.0.1:8000` — runs on a **Python 3.12** venv (via deadsnakes PPA), not the OS default `python3`. Newer Ubuntu images ship Python versions too new for `pydantic-core`'s prebuilt wheels/PyO3 build toolchain; the deploy script installs 3.12 automatically. |
+| AI (internal) | `127.0.0.1:8000` — runs on a **Python 3.12** venv, not the OS default `python3`. On Ubuntu 24.04 `python3.12` ships by default but `python3.12-venv` does **not** — it's a separate apt package. The deploy script always `apt-get install`s `python3.12 python3.12-venv python3.12-dev`, and only adds the deadsnakes PPA first if the `python3.12` binary itself is missing (older Ubuntu images). |
 | Process manager | PM2 — `scripts/ecosystem.config.cjs` |
 | Nginx config | `nginx/rightdirection-ip.conf` |
 | Firewall | UFW, default deny incoming, allow only `22/tcp` and `8090/tcp` |
 
 ### Secrets & env
 - Production env file: **`.env.production`** on your machine (gitignored). Deploy copies it to `/var/www/rightdirection/.env` via scp — never commit it.
-- `FRONTEND_URL` must match the public origin (e.g. `http://139.59.87.174:8090`) so cookies and redirects work on HTTP.
+- `FRONTEND_URL` must match the public origin (e.g. `http://134.209.158.145:8090`) so cookies and redirects work on HTTP.
+- `DATABASE_URL`'s password is treated as the source of truth: the deploy script extracts it from `.env.production` (falling back to `rd_prod_change_me` only if none is set) and uses that same value for `CREATE USER` on a fresh box, so the Postgres role and the app's connection string can never drift apart.
 
 ### Security incident (2026-07-13) — why SSH is hardened
-The droplet was rebuilt (fresh OS image) and briefly ran with DigitalOcean's default `PasswordAuthentication yes` + `PermitRootLogin yes` while the deploy was being set up. Within ~30 minutes it was brute-forced and a rootkit-style backdoor was planted (an immutable `/etc/cron.d/root` entry pulling a remote payload every 10 min, plus an actively-running malicious binary). Root cause was password auth being enabled by default on a freshly-provisioned box with a public IP — not an application vulnerability.
+The previous droplet (`139.59.87.174`) was rebuilt (fresh OS image) and briefly ran with DigitalOcean's default `PasswordAuthentication yes` + `PermitRootLogin yes` while the deploy was being set up. Within ~30 minutes it was brute-forced and a rootkit-style backdoor was planted (an immutable `/etc/cron.d/root` entry pulling a remote payload every 10 min, plus an actively-running malicious binary). Root cause was password auth being enabled by default on a freshly-provisioned box with a public IP — not an application vulnerability. That droplet was decommissioned 2026-07-14 and replaced with `134.209.158.145` above.
 
-**Remediation now baked into the deploy script** (`scripts/deploy-digitalocean.sh`), applied as the *very first* step on any fresh box, before any package installs:
+**Remediation baked into the deploy script** (`scripts/deploy-digitalocean.sh`), applied as the *very first* step on any fresh box, before any package installs:
 - `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password` (via `/etc/ssh/sshd_config.d/00-harden.conf`)
 - UFW firewall: default deny incoming, allow only `22/tcp` and `8090/tcp`
 
 **If the server is ever rebuilt again:**
-1. Add the local machine's SSH pubkey to `~/.ssh/authorized_keys` via the DigitalOcean **web console** (not this repo's key — that only exists locally) — run the `mkdir`/`echo`/`chmod` steps as **separate single-line commands**, not one long combined line (the browser console mangles long pasted lines with embedded `&&`/`>>`).
+1. Add the local machine's SSH pubkey to `~/.ssh/authorized_keys` via the DigitalOcean **web console** — run the `mkdir`/`echo`/`chmod` steps as **separate single-line commands**, not one long combined line (the browser console hard-wraps long pasted lines by inserting real newlines, which breaks shell syntax mid-command — this happened again on 2026-07-14; if it does, split the key itself into ~30-char `printf` chunks appended one at a time, then verify with `tail -c 200 ~/.ssh/authorized_keys` before retrying SSH).
 2. Run `./scripts/deploy-digitalocean.sh` — it hardens SSH + firewall first, then will stop and print a fresh GitHub deploy-key pubkey if one isn't registered yet (register it under repo Settings → Deploy keys, read-only, then re-run).
-3. Treat any secrets that were on a compromised box as exposed. `.env.production` values (DB password, JWT secret, third-party API keys) were **not** rotated after this incident (data loss was acceptable for this demo environment) — rotate them before this becomes anything more than a demo box.
+3. Treat any secrets that were on a compromised box as exposed. Rotate `.env.production` values (DB password, JWT secret, third-party API keys) before this becomes anything more than a demo box — the 2026-07-13 incident did **not** rotate them (data loss was acceptable for that demo environment at the time).
+
+### Deploy script gotchas (found/fixed 2026-07-14, worth knowing before editing the script)
+- The remote setup runs as a heredoc piped into `ssh ... bash -s`. **The heredoc delimiter must stay quoted (`<<'REMOTE'`)** — an unquoted delimiter makes bash expand every `$(...)`/`${...}` in the body *locally* before it ever reaches the server, so checks like `node -v` silently ran on the dev machine instead of the droplet and the "deploy" did nothing while reporting success. Variables the remote side needs (`RD`, `GIT_REPO`, `GIT_BRANCH`, `DB_PASSWORD`, `SERVER_IP`) are passed in as an env-var prefix to the remote command instead (`VAR=val ... bash -s`), shell-escaped with `printf %q`.
+- Any command *inside* that remote script which itself invokes `ssh` must redirect its stdin from `/dev/null` (or use `ssh -n`). Otherwise it shares the same stdin stream that's still feeding the rest of the outer script to `bash -s`, and consumes/truncates it — the script would stop dead silently right after that line, exit 0, with no error. This bit the GitHub-deploy-key connectivity check (`ssh -T git@github.com`).
+- A pipeline like `ssh ... | grep -q ...` under `set -o pipefail` reports failure if `ssh` itself exits non-zero — which it always does for `-T` — **even when `grep` found its match**, because pipefail takes the last non-zero exit in the pipeline, not "did the whole thing logically succeed." Capture the command's output into a variable first, then `grep` the variable.
+- The final post-deploy health check only `sleep 3`'d before curling the API — not always enough time for NestJS + Prisma to finish booting, especially under load right after a build. It's now a retry loop (up to 40s) and failures there are warnings, not `set -e` deploy failures.
 
 ### Verify after deploy
 ```bash
-curl http://139.59.87.174:8090/api/v1/health   # database + redis ok
+curl http://134.209.158.145:8090/api/v1/health   # database + redis ok
 # On server: git -C /var/www/rightdirection rev-parse --short HEAD  # should match origin/main
 ```
-
-**Note:** The droplet has 3.8GB RAM (upgraded 2026-07-13 from 1.9GB, specifically to reduce OOM risk during builds). On-server `curl` during deploy may still occasionally exit 137 (OOM) after a full Next build; PM2/nginx can still be healthy — check from your machine or `pm2 list`.
 
 ### Demo credentials (seed)
 - Admin: `admin@rightdirection.com` / `Admin@123`

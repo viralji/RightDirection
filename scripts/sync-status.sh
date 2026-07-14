@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SERVER_IP="${1:-139.59.87.174}"
-SSH_KEY="${SSH_KEY:-$HOME/.ssh/do_139.59.87.174}"
+SERVER_IP="${1:-134.209.158.145}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/do_134.209.158.145}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 
 cd "$ROOT"
