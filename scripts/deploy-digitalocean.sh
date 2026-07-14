@@ -31,8 +31,34 @@ RD=${REMOTE_DIR}
 GIT_REPO='${GIT_REPO}'
 GIT_BRANCH='${GIT_BRANCH}'
 
-# --- Bootstrap (fresh server) ---
+# --- Harden SSH (idempotent; must run before anything else on a fresh box) ---
+cat > /etc/ssh/sshd_config.d/00-harden.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+EOF
+sshd -t && (systemctl reload ssh.service 2>/dev/null || systemctl reload sshd.service 2>/dev/null || true)
+
+# --- Firewall: only SSH + app port (idempotent) ---
 export DEBIAN_FRONTEND=noninteractive
+command -v ufw >/dev/null 2>&1 || apt-get install -y ufw -qq
+ufw allow 22/tcp >/dev/null 2>&1 || true
+ufw allow 8090/tcp >/dev/null 2>&1 || true
+ufw --force enable >/dev/null 2>&1 || true
+
+# --- Verify GitHub deploy-key access before doing anything expensive ---
+ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null || true
+if ! ssh -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+  [ -f /root/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N '' -C 'deploy@rightdirection-server' -q
+  echo "ERROR: This server has no working GitHub deploy key yet."
+  echo "Add this key as a read-only Deploy Key on the repo (Settings > Deploy keys), then re-run:"
+  echo "---"
+  cat /root/.ssh/id_ed25519.pub
+  echo "---"
+  exit 1
+fi
+
+# --- Bootstrap (fresh server) ---
 apt-get update -qq
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ] 2>/dev/null; then
   echo "==> Install Node.js 20"
@@ -60,9 +86,9 @@ fi
 systemctl enable redis-server nginx postgresql 2>/dev/null || true
 systemctl start redis-server nginx postgresql 2>/dev/null || true
 
-# pgvector (best-effort)
-apt-get install -y postgresql-16-pgvector 2>/dev/null || \
-  apt-get install -y postgresql-15-pgvector 2>/dev/null || true
+# pgvector (best-effort, matched to whatever PG major version got installed)
+PG_MAJOR="$(psql -V | grep -oP '\d+' | head -1)"
+apt-get install -y "postgresql-${PG_MAJOR}-pgvector" 2>/dev/null || true
 
 # --- Git: clone or pull (source of truth) ---
 if [ -d "\$RD/.git" ]; then
@@ -107,9 +133,17 @@ export NEXT_PUBLIC_BASE_DOMAIN=rightdirection.com
 npm ci
 npm run build
 
-# --- AI service ---
+# --- AI service (needs Python 3.12 — pydantic-core has no wheels/build path for newer
+# Python on brand-new Ubuntu images yet; deadsnakes PPA covers this reliably) ---
+if ! command -v python3.12 >/dev/null 2>&1; then
+  apt-get install -y software-properties-common -qq
+  add-apt-repository -y ppa:deadsnakes/ppa
+  apt-get update -qq
+  apt-get install -y python3.12 python3.12-venv python3.12-dev build-essential -qq
+fi
 cd "\$RD/ai-service"
-python3 -m venv venv
+rm -rf venv
+python3.12 -m venv venv
 ./venv/bin/pip install -q -r requirements.txt
 
 # --- PM2 ---

@@ -1,6 +1,6 @@
 # RightDirection — AGENTS.md
 **Quick reference for AI coding agents**
-Last updated: 2026-06-18
+Last updated: 2026-07-14
 
 > **Source of truth:** [`CLAUDE.md`](CLAUDE.md) — architecture, deploy workflow, build status.  
 > **Planning archive:** [`docs/planning/`](docs/planning/) — historical blueprints (may be stale).
@@ -17,6 +17,7 @@ local edit → git commit → git push origin main → npm run deploy
 - Never rsync/scp application code to the server
 - Only `.env.production` is scp'd (secrets, not in git)
 - Verify: `npm run sync:status`
+- Server SSH is **key-only** (password auth disabled) — see CLAUDE.md → Security incident for why, and for the rebuild/re-hardening steps if the droplet is ever rebuilt
 
 ---
 
