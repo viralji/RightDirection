@@ -253,6 +253,20 @@ curl http://134.209.158.145:8090/api/v1/health   # database + redis ok
 - Agent: `owner@studyvision.com` / `Demo@123`
 - Student: `student@example.com` / `Demo@123`
 
+### Security audit (2026-07-14) — was the compromise caused by our code?
+Ran a full audit while migrating to the new droplet, prompted by the 2026-07-13 incident. Short answer: the *actual* incident was SSH password auth on a fresh box, not application code — but the audit also turned up a real, unrelated, currently-live risk that needed closing regardless.
+
+**Clean:**
+- Git history (14 commits, single author, no force-pushes/rewrites): no `.env` files ever committed, no hardcoded secrets/API keys/private keys anywhere in full history.
+- No command-injection patterns (`exec`/`eval`/`child_process`/`subprocess`) anywhere in `api/src` or `ai-service/app`.
+- New server: no cron backdoors, no rogue users, no unexpected SSH keys, no recently-modified system binaries, UFW correctly blocks everything except `22`/`8090` (verified externally — port 80, where nginx's default site used to also listen, is unreachable from outside; the default site is now disabled entirely as defense in depth).
+
+**Found and fixed:** the web app was running **Next.js 15.0.0**, vulnerable to an unauthenticated RCE (CVSS 10.0, CVE-2025-66478/CVE-2025-55182) in the React Server Components protocol, under active exploitation in the wild since December 2025 — a single crafted HTTP request against the App Router. There is no patch within the 15.0.x line covering everything: the Dec 2025 fix line tops out at 15.0.7, and a further May 2026 release (13 more CVEs, including a **middleware/auth-bypass via segment-prefetch URLs** — directly relevant to this app's `web/middleware.ts` tenant/role routing) has no fix at all below **15.5.18**. Upgraded straight to `^15.5.18` (resolved `15.5.20`); build + typecheck verified clean across all 37 routes, then redeployed and re-verified (health check, page load, live demo login) against the server.
+
+Also removed the `xlsx` dependency from `api/` — unused anywhere in the codebase, with a prototype-pollution/ReDoS vulnerability that has no upstream fix.
+
+**Known residual risk (not yet addressed, lower urgency):** `npm audit` on `api/` still shows moderate/high findings in NestJS-ecosystem runtime packages (`@nestjs/core`, `@nestjs/platform-express`, `express`, `body-parser`, `multer`, `lodash`, `qs`, etc.). These are tied to **NestJS v10** itself — fully resolving them means a NestJS major-version upgrade (v10 → v11+), which is a separate, larger undertaking (breaking changes likely, needs its own testing pass) and hasn't been done. Worth scheduling as its own task; not a driver of either known incident.
+
 ---
 
 ## Dev Notes
